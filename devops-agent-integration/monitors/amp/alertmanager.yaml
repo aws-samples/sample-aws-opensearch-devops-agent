@@ -1,0 +1,32 @@
+# AMP Alertmanager definition -> SNS (devops-agent-alerts)
+#
+# Routes firing alerts from the rule group (rule-group.yaml) to the existing
+# devops-agent-alerts SNS topic, which fans out to the devops-agent-signal-bridge
+# Lambda. AMP signs the SNS Publish with SigV4; publish permission is granted by an
+# SNS topic-policy statement for the aps.amazonaws.com service principal scoped to
+# this workspace ARN (see README / deploy notes).
+#
+# The `message` template emits the Alertmanager alert JSON (alerts[].labels /
+# alerts[].annotations). The signal-bridge Lambda's parseEnvelope reads
+# alerts[0].labels.monitorId and alerts[0].annotations.runbookRef from this shape.
+#
+# repeat_interval 60m mirrors the 60-minute throttle on the OpenSearch monitors so
+# a sustained fault does not flood the agent.
+alertmanager_config: |
+  route:
+    receiver: devops-agent-sns
+    group_by: ['monitorId']
+    group_wait: 15s
+    group_interval: 60s
+    repeat_interval: 60m
+  receivers:
+    - name: devops-agent-sns
+      sns_configs:
+        - topic_arn: arn:aws:sns:ap-southeast-2:111122223333:devops-agent-alerts
+          sigv4:
+            region: ap-southeast-2
+          subject: 'DevOpsAgent metric alert {{ .CommonLabels.monitorId }} [{{ .Status }}]'
+          message: |
+            {"status":"{{ .Status }}","alerts":[{{ range $i, $a := .Alerts }}{{ if $i }},{{ end }}{"status":"{{ $a.Status }}","labels":{"monitorId":"{{ $a.Labels.monitorId }}","severity":"{{ $a.Labels.severity }}","alertname":"{{ $a.Labels.alertname }}"},"annotations":{"triggeringCondition":"{{ $a.Annotations.triggeringCondition }}","runbookRef":"{{ $a.Annotations.runbookRef }}"},"startsAt":"{{ $a.StartsAt }}"}{{ end }}]}
+          attributes:
+            monitorId: M-amp-promql

@@ -1,0 +1,61 @@
+{
+  "type": "monitor",
+  "name": "M-travelagent-latency-slo",
+  "monitor_type": "query_level_monitor",
+  "enabled": true,
+  "schedule": { "period": { "interval": 1, "unit": "MINUTES" } },
+  "inputs": [
+    {
+      "search": {
+        "indices": ["otel-v1-apm-span*"],
+        "query": {
+          "size": 0,
+          "query": {
+            "bool": {
+              "filter": [
+                { "term": { "kind": "SPAN_KIND_SERVER" } },
+                { "terms": { "serviceName": ["weather-agent"] } },
+                { "range": { "endTime": { "gte": "now-5m", "lte": "now" } } }
+              ]
+            }
+          },
+          "aggs": {
+            "svc": {
+              "terms": { "field": "serviceName", "size": 20 },
+              "aggs": {
+                "slow": {
+                  "filter": { "range": { "durationInNanos": { "gte": 5000000000 } } }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "name": "weather-agent-slow-call-ratio-high",
+      "severity": "1",
+      "condition": {
+        "script": {
+          "lang": "painless",
+          "source": "for (b in ctx.results[0].aggregations.svc.buckets) { if (b.doc_count < params.minReq) continue; double slow = b.slow.doc_count; double ratio = slow / (double) b.doc_count; if (ratio >= params.threshold) return true; } return false;",
+          "params": { "threshold": 0.20, "minReq": 5 }
+        }
+      },
+      "actions": [
+        {
+          "name": "notify-sns",
+          "destination_id": "devops-agent-sns",
+          "throttle_enabled": true,
+          "throttle": { "value": 60, "unit": "MINUTES" },
+          "message_template": {
+            "source": "monitorId=M-travelagent-latency-slo condition=weather-agent-slow-calls>5s-ratio>=20% ts={{ctx.periodEnd}} runbook=runbook://M-travelagent-latency-slo",
+            "lang": "mustache"
+          }
+        }
+      ]
+    }
+  ]
+}

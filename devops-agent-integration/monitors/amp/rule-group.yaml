@@ -1,0 +1,41 @@
+# AMP rule group namespace: devops-agent-integration
+#
+# Metric-driven monitor (M-amp-promql). The alerting rule fires when the checkout
+# error ratio breaches its threshold, routes to SNS via the alertmanager definition
+# (alertmanager.yaml), and flows through the existing devops-agent-signal-bridge
+# Lambda into a DevOps Agent investigation.
+#
+# REAL metric (verified against the AMP workspace by querying it directly with
+# PromQL — ListMetrics/query):
+#   app_frontend_requests__total  — labels: method, status ("200"/"304"/"500"),
+#   target (e.g. "/api/checkout"), resource_service_name="frontend".
+#
+#   NOTE: http_server_request_duration_seconds_count does NOT carry the demo
+#   service_name/status labels (only service_name="flagd" is present), so the
+#   previous checkout-5xx expr on that metric could never match. The frontend
+#   counter is the real request/error signal for the demo edge.
+#
+# Observed checkout-scoped 5xx ratio (verified by inducing paymentFailure):
+#   baseline (all flags off)      : 0.0   (0%)   -> 200s only, no 500s
+#   paymentFailure=100%           : 1.0   (100%) -> every /api/checkout returns 500
+# Threshold 0.2 (20%) sits far above baseline noise and far below the fault value.
+groups:
+  - name: otel-demo-slo
+    interval: 60s                    # 15s <= interval <= 5m (R3.3)
+    rules:
+      - alert: CheckoutErrorRatioHighPromQL
+        # Frontend 5xx ratio for the checkout edge over 5m.
+        # denominator is 0 when there is no checkout traffic -> no result -> no fire.
+        expr: |
+          (
+            sum(rate(app_frontend_requests__total{status=~"5..", target="/api/checkout"}[5m]))
+            /
+            sum(rate(app_frontend_requests__total{target="/api/checkout"}[5m]))
+          ) > 0.2
+        for: 2m                       # must hold >= one full interval (R3.4)
+        labels:
+          severity: high
+          monitorId: M-amp-promql
+        annotations:
+          triggeringCondition: "checkout 5xx ratio > 20% (app_frontend_requests__total{target=/api/checkout}, PromQL)"
+          runbookRef: "runbook://M-amp-promql"

@@ -1,0 +1,60 @@
+{
+  "type": "monitor",
+  "name": "M-trace-latency-slo",
+  "monitor_type": "query_level_monitor",
+  "enabled": true,
+  "schedule": { "period": { "interval": 1, "unit": "MINUTES" } },
+  "inputs": [
+    {
+      "search": {
+        "indices": ["otel-v1-apm-span*"],
+        "query": {
+          "size": 0,
+          "query": {
+            "bool": {
+              "filter": [
+                { "term": { "kind": "SPAN_KIND_SERVER" } },
+                { "terms": { "serviceName": ["checkout", "payment", "cart", "product-catalog"] } },
+                { "range": { "endTime": { "gte": "now-5m", "lte": "now" } } }
+              ]
+            }
+          },
+          "aggs": {
+            "svc": {
+              "terms": { "field": "serviceName", "size": 20 },
+              "aggs": {
+                "latency_pct": {
+                  "percentiles": { "field": "durationInNanos", "percents": [95] }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "name": "p95-latency-over-slo",
+      "severity": "1",
+      "condition": {
+        "script": {
+          "lang": "painless",
+          "source": "for (b in ctx.results[0].aggregations.svc.buckets) { if (b.doc_count < params.minReq) continue; def p = b.latency_pct.values['95.0']; if (p == null) continue; double ms = p / 1000000.0; if (ms > params.thresholdMs) return true; } return false;",
+          "params": { "thresholdMs": 250, "minReq": 5 }
+        }
+      },
+      "actions": [
+        {
+          "name": "notify-sns",
+          "destination_id": "<sns-notification-channel-id>",
+          "throttle_enabled": true,
+          "throttle": { "value": 60, "unit": "MINUTES" },
+          "message_template": {
+            "source": "monitorId=M-trace-latency-slo condition=checkout/purchase-path-p95>250ms ts={{ctx.periodEnd}} runbook=runbook://M-trace-latency-slo"
+          }
+        }
+      ]
+    }
+  ]
+}

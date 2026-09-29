@@ -1,0 +1,70 @@
+THIRD-PARTY LICENSES
+====================
+
+This sample depends on, packages, or references the third-party components
+listed below. Each remains under its own license. This list covers the primary
+direct dependencies; the complete transitive set is resolved from
+`devops-agent-integration/package-lock.json` (npm) and the Python requirements
+baked into the MCP server container images. Run a license scan (for example
+`license-checker` for npm and `pip-licenses` for Python) to regenerate the full
+set before publishing.
+
+--------------------------------------------------------------------------------
+Component: opensearch-mcp-server-py
+Publisher: OpenSearch Project
+Source:    https://github.com/opensearch-project/opensearch-mcp-server-py
+License:   Apache License 2.0
+Use:       OpenSearch MCP evidence server (container image)
+
+--------------------------------------------------------------------------------
+Component: OpenTelemetry Demo ("Astronomy Shop")
+Publisher: OpenTelemetry Authors / CNCF
+Source:    https://github.com/open-telemetry/opentelemetry-demo
+License:   Apache License 2.0
+Use:       Demo workload generating telemetry and injectable faults
+
+--------------------------------------------------------------------------------
+Component: OpenTelemetry Collector (Contrib distribution)
+Publisher: OpenTelemetry Authors / CNCF
+Source:    https://github.com/open-telemetry/opentelemetry-collector-contrib
+License:   Apache License 2.0
+Use:       Telemetry collection and SigV4 export to OSIS / AMP
+
+--------------------------------------------------------------------------------
+Component: flagd (OpenFeature)
+Publisher: OpenFeature Authors / CNCF
+Source:    https://github.com/open-feature/flagd
+License:   Apache License 2.0
+Use:       Feature-flag fault injection for the demo workload
+
+--------------------------------------------------------------------------------
+Component: aws-cdk-lib, constructs, aws-cdk (CLI)
+Publisher: Amazon Web Services
+Source:    https://github.com/aws/aws-cdk
+License:   Apache License 2.0
+Use:       Infrastructure-as-code framework
+
+--------------------------------------------------------------------------------
+Component: fast-check
+Publisher: Nicolas Dubien and contributors
+Source:    https://github.com/dubzzz/fast-check
+License:   MIT License
+Use:       Property-based testing
+
+--------------------------------------------------------------------------------
+Component: jest, ts-jest, ts-node, typescript, @types/*
+Publishers: OpenJS Foundation / Microsoft / DefinitelyTyped contributors
+Licenses:   MIT License (Apache-2.0 for TypeScript)
+Use:        Build and test tooling (devDependencies)
+
+--------------------------------------------------------------------------------
+Component: MCP Python SDK / FastMCP
+Publisher: Model Context Protocol community
+Source:    https://github.com/modelcontextprotocol/python-sdk
+License:   MIT License
+Use:       Streamable-HTTP MCP transport used by the OpenSearch MCP server image
+
+--------------------------------------------------------------------------------
+Full license texts:
+  Apache-2.0 : https://www.apache.org/licenses/LICENSE-2.0
+  MIT        : https://opensource.org/licenses/MIT

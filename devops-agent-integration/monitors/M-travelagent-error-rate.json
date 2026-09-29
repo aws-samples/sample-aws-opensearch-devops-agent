@@ -1,0 +1,70 @@
+{
+  "type": "monitor",
+  "name": "M-travelagent-error-rate",
+  "monitor_type": "query_level_monitor",
+  "enabled": true,
+  "schedule": { "period": { "interval": 1, "unit": "MINUTES" } },
+  "inputs": [
+    {
+      "search": {
+        "indices": ["otel-v1-apm-span*"],
+        "query": {
+          "size": 0,
+          "query": {
+            "bool": {
+              "filter": [
+                { "term": { "kind": "SPAN_KIND_SERVER" } },
+                { "terms": { "serviceName": ["travel-planner", "weather-agent", "events-agent"] } },
+                { "range": { "endTime": { "gte": "now-5m", "lte": "now" } } }
+              ]
+            }
+          },
+          "aggs": {
+            "svc": {
+              "terms": { "field": "serviceName", "size": 20 },
+              "aggs": {
+                "errors": {
+                  "filter": {
+                    "bool": {
+                      "minimum_should_match": 1,
+                      "should": [
+                        { "range": { "attributes.http.status_code": { "gte": 500 } } },
+                        { "term": { "attributes.http.status_code": 429 } },
+                        { "term": { "status.code": 2 } }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "name": "travel-agent-error-rate-high",
+      "severity": "1",
+      "condition": {
+        "script": {
+          "lang": "painless",
+          "source": "for (b in ctx.results[0].aggregations.svc.buckets) { if (b.doc_count < params.minReq) continue; double err = b.errors.doc_count; double ratio = err / (double) b.doc_count; if (ratio >= params.threshold) return true; } return false;",
+          "params": { "threshold": 0.10, "minReq": 5 }
+        }
+      },
+      "actions": [
+        {
+          "name": "notify-sns",
+          "destination_id": "devops-agent-sns",
+          "throttle_enabled": true,
+          "throttle": { "value": 60, "unit": "MINUTES" },
+          "message_template": {
+            "source": "monitorId=M-travelagent-error-rate condition=travel-agent-server-error-rate>=10% services=travel-planner,weather-agent,events-agent ts={{ctx.periodEnd}} runbook=runbook://M-travelagent-error-rate",
+            "lang": "mustache"
+          }
+        }
+      ]
+    }
+  ]
+}

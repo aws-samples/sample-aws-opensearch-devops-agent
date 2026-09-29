@@ -1,0 +1,25 @@
+# Node / CDK
+node_modules/
+cdk.out/
+*.js
+!jest.config.js
+*.d.ts
+*.tsbuildinfo
+
+# Python (MCP servers)
+__pycache__/
+*.pyc
+.venv/
+
+# Local env / secrets — never commit
+.env
+.env.*
+*.pem
+*.key
+secrets.json
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log

@@ -1,0 +1,44 @@
+%% Autonomous Monitoring using Amazon OpenSearch Service and AWS DevOps Agent
+%% Render to PNG:  mmdc -i architecture.mmd -o architecture.png -b transparent
+%% (mmdc = @mermaid-js/mermaid-cli).  GitHub also renders this inline in Markdown.
+graph TD
+    subgraph EC2["OTel Demo Host (SSM-managed)"]
+        DEMO["OpenTelemetry demo workloads<br/>Astronomy Shop + GenAI travel planner"]
+        FLAGS["Fault injection<br/>flagd + fault-panel"]
+        OTEL["OpenTelemetry Collector<br/>SigV4 exporters"]
+        FLAGS --> DEMO
+        DEMO -->|OTLP localhost| OTEL
+    end
+
+    subgraph PLATFORM["Observability platform (Part 1)"]
+        OSIS["Amazon OpenSearch Ingestion<br/>Data Prepper"]
+        OS[("Amazon OpenSearch Service<br/>logs / traces / service map")]
+        AMP[("Amazon Managed Prometheus<br/>metrics")]
+    end
+
+    subgraph DETECT["Detection + signal bridge (Part 2)"]
+        MON["OpenSearch Alerting monitors"]
+        RULE["AMP alerting rules"]
+        SNS["Amazon SNS<br/>devops-agent-alerts"]
+        LAMBDA["Signal Bridge Lambda<br/>HMAC-SHA256 sign"]
+    end
+
+    subgraph AGENT["AWS DevOps Agent"]
+        DOA["Investigation + RCA<br/>INCIDENT_RCA runbook"]
+    end
+
+    subgraph MCP["MCP evidence server — ECS Fargate (VPC-private, TLS)"]
+        MCPOS["OpenSearch MCP<br/>Search / PPL / mappings / shards"]
+    end
+
+    OTEL -->|OTLP + SigV4| OSIS
+    OTEL -->|remote_write SigV4| AMP
+    OSIS --> OS
+    OS --> MON
+    AMP --> RULE
+    MON -->|breach| SNS
+    RULE -->|breach| SNS
+    SNS --> LAMBDA
+    LAMBDA -->|HMAC webhook POST| DOA
+    DOA -->|PrivateConnection| MCPOS
+    MCPOS -->|IAM/SigV4| OS

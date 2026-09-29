@@ -1,0 +1,53 @@
+{
+  "type": "monitor",
+  "name": "M-logs-error-rate",
+  "monitor_type": "query_level_monitor",
+  "enabled": true,
+  "schedule": { "period": { "interval": 1, "unit": "MINUTES" } },
+  "inputs": [
+    {
+      "search": {
+        "indices": ["logs-otel-v1*"],
+        "query": {
+          "size": 0,
+          "query": {
+            "bool": {
+              "filter": [
+                { "terms": { "resource.attributes.service.name": ["payment", "checkout"] } },
+                { "range": { "time": { "gte": "now-5m", "lte": "now" } } }
+              ]
+            }
+          },
+          "aggs": {
+            "total": { "value_count": { "field": "time" } },
+            "errors": { "filter": { "range": { "severityNumber": { "gte": 13 } } } }
+          }
+        }
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "name": "error-rate-over-5pct",
+      "severity": "1",
+      "condition": {
+        "script": {
+          "lang": "painless",
+          "source": "double total = ctx.results[0].aggregations.total.value; if (total == 0) return false; double errPct = (ctx.results[0].aggregations.errors.doc_count / total) * 100.0; return errPct >= params.threshold;",
+          "params": { "threshold": 5 }
+        }
+      },
+      "actions": [
+        {
+          "name": "notify-sns",
+          "destination_id": "<sns-notification-channel-id>",
+          "throttle_enabled": true,
+          "throttle": { "value": 60, "unit": "MINUTES" },
+          "message_template": {
+            "source": "monitorId=M-logs-error-rate condition=error-rate>=5% ts={{ctx.periodEnd}} runbook=runbook://M-logs-error-rate"
+          }
+        }
+      ]
+    }
+  ]
+}

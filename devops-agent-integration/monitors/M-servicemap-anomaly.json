@@ -1,0 +1,58 @@
+{
+  "type": "monitor",
+  "name": "M-servicemap-anomaly",
+  "monitor_type": "query_level_monitor",
+  "enabled": true,
+  "schedule": { "period": { "interval": 5, "unit": "MINUTES" } },
+  "inputs": [
+    {
+      "search": {
+        "indices": ["otel-v1-apm-span*"],
+        "query": {
+          "size": 0,
+          "query": {
+            "bool": {
+              "filter": [
+                { "term": { "kind": "SPAN_KIND_SERVER" } },
+                { "terms": { "serviceName": ["cart", "checkout", "payment", "recommendation", "currency", "shipping", "email"] } },
+                { "range": { "endTime": { "gte": "now-5m", "lte": "now" } } }
+              ]
+            }
+          },
+          "aggs": {
+            "edges": {
+              "terms": { "field": "serviceName", "size": 50 },
+              "aggs": {
+                "errors": { "filter": { "range": { "status.code": { "gte": 2 } } } }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "name": "any-anomalous-edge",
+      "severity": "2",
+      "condition": {
+        "script": {
+          "lang": "painless",
+          "source": "for (b in ctx.results[0].aggregations.edges.buckets) { double tot = b.doc_count; if (tot < params.minReq) continue; double errRate = (b.errors.doc_count / tot) * 100.0; if (errRate >= params.edgeErrPct) return true; } return false;",
+          "params": { "edgeErrPct": 5, "minReq": 10 }
+        }
+      },
+      "actions": [
+        {
+          "name": "notify-sns",
+          "destination_id": "<sns-notification-channel-id>",
+          "throttle_enabled": true,
+          "throttle": { "value": 60, "unit": "MINUTES" },
+          "message_template": {
+            "source": "monitorId=M-servicemap-anomaly condition=svc-err>=5% ts={{ctx.periodEnd}} runbook=runbook://M-servicemap-anomaly"
+          }
+        }
+      ]
+    }
+  ]
+}
