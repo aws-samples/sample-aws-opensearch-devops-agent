@@ -36,6 +36,12 @@ domain, **AMP workspace**, OSIS pipeline, and **OTel demo EC2 host**):
 ```bash
 npx @opensearch-project/observability-stack        # https://observability.opensearch.org/docs/deploy/aws/
 ```
+> Supply-chain note: `npx` fetches the latest published `@opensearch-project/observability-stack`
+> at runtime. This upstream installer runs an **interactive guided deployment** where the
+> OpenSearch version and components are selected in the steps *after* the `npx` invocation, so
+> the OpenSearch release is chosen (and thereby pinned) during that flow. To also pin the
+> installer package itself to a known-good release, append a version — `npx
+> @opensearch-project/observability-stack@<version>`.
 Then capture coordinates (you type only these two):
 ```bash
 export DOMAIN_NAME=<opensearch-domain-name>

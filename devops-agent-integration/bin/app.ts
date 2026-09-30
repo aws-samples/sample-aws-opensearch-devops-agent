@@ -396,20 +396,20 @@ const signalBridge = new SignalBridgeStack(app, "DevOpsAgent-SignalBridge", {
 //     intra-VPC. The images are arm64, so the task definitions use an arm64
 //     runtimePlatform.
 //
-//     NETWORKING: the stack defaults to PRIVATE subnets with no public IP
-//     (secure-by-default), which requires a NAT gateway or VPC endpoints for
-//     ECR/CloudWatch/STS/AMP egress. The bundled single-subnet demo instead reuses
-//     an IGW-routed PUBLIC subnet, so `assignPublicIp` is set true here as an
-//     explicit opt-in. Set `assignPublicIpForFargate` context to `false` (and
-//     supply private subnets + endpoints) for the hardened posture.
+//     NETWORKING: secure-by-default is PRIVATE subnets with no public IP, which
+//     requires a NAT gateway or VPC endpoints for ECR/CloudWatch/STS/AMP egress.
+//     `assignPublicIpForFargate` context therefore DEFAULTS TO FALSE. The bundled
+//     single-subnet demo reuses an IGW-routed PUBLIC subnet with no NAT, so the
+//     Quick Start explicitly passes `-c assignPublicIpForFargate=true` to opt in.
 const fargate = new FargateMcpStack(app, "DevOpsAgent-FargateMcp", {
   env,
   description:
-    "Phase 1 + 2a: two maintained MCP servers on ECS Fargate, fronted by internal TLS NLBs with stable private DNS (mcp.internal).",
+    "Phase 1 + 2a: the OpenSearch MCP server on ECS Fargate, fronted by an internal TLS NLB with stable private DNS (mcp.internal).",
   vpc: shared.obsVpc,
   subnetIds: obsSubnetIds,
-  // Opt-in for the public-subnet quickstart; default posture is private (false).
-  assignPublicIp: cfg("assignPublicIpForFargate", "true") === "true",
+  // Secure-by-default: private (no public IP) unless the operator opts in with
+  // `-c assignPublicIpForFargate=true` (the public-subnet quickstart path).
+  assignPublicIp: cfg("assignPublicIpForFargate", "false") === "true",
   securityGroupId: obsSecurityGroupId,
   // OPENSEARCH_URL needs an https scheme; the context var is the bare host.
   opensearchEndpoint: `https://${opensearchEndpoint}`,

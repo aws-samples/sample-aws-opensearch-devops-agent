@@ -15,7 +15,8 @@ platform) is a prerequisite — see [`../observability-stack/README.md`](../obse
   this repo can create it for you.)
 - A **deployed Part 1 platform**: a VPC-private OpenSearch domain, an AMP workspace, an
   OSIS pipeline, and the OpenTelemetry demo on an SSM-managed EC2 host.
-- Node.js 18+, AWS CDK v2 (`npm install -g aws-cdk`), AWS CLI v2, python3.
+- Node.js 18+, AWS CDK v2 (pin the CLI to the tested version:
+  `npm install -g aws-cdk@2.1141.0`), AWS CLI v2, python3.
 - **No local Docker needed** — the OpenSearch MCP image is built as **arm64** in-account
   by an AWS CodeBuild project on native ARM compute (the `DevOpsAgent-Build` stack).
 - AWS credentials for the target account (admin), including permission to create the

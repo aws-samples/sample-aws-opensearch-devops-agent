@@ -197,6 +197,7 @@ cdk deploy --all \
   -c ampWorkspaceId=... -c ampEndpoint=... -c ampWorkspaceArn=... \
   -c fgacMasterRoleArn=... \
   -c devopsAgentWebhookUrl="<YOUR_WEBHOOK_URL>" \
+  -c assignPublicIpForFargate=true \   # public-subnet quickstart; omit for private (secure-by-default, needs NAT/VPC endpoints)
   --require-approval never
 
 # 5. Register detection + notification role, then verify the loop (read-only)

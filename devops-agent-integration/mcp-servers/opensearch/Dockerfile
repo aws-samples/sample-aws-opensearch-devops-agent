@@ -19,7 +19,9 @@
 # service using OPENSEARCH_URL + AWS_REGION and the role credentials it finds in
 # the standard AWS credential chain.
 
-FROM python:3.12-slim
+# Base image pulled from ECR Public (the AWS-hosted mirror of the Docker official
+# `python` images) rather than Docker Hub, per internal container guidelines.
+FROM public.ecr.aws/docker/library/python:3.12-slim
 
 # ---- Build metadata -------------------------------------------------------
 LABEL org.opencontainers.image.title="devops-agent-opensearch-mcp" \

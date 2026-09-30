@@ -22,6 +22,7 @@ import * as path from "path";
 import * as cdk from "aws-cdk-lib";
 import * as codebuild from "aws-cdk-lib/aws-codebuild";
 import * as ecr from "aws-cdk-lib/aws-ecr";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3assets from "aws-cdk-lib/aws-s3-assets";
 import { Construct } from "constructs";
 
@@ -77,6 +78,9 @@ export class BuildStack extends cdk.Stack {
             commands: [
               "echo Logging in to ECR $REGISTRY",
               "aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REGISTRY",
+              // Authenticate to ECR Public too (the Dockerfile base image is on
+              // public.ecr.aws); avoids anonymous-pull rate limits during build.
+              "aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws",
             ],
           },
           build: {
@@ -98,6 +102,16 @@ export class BuildStack extends cdk.Stack {
     // Least-privilege: build role may push to the repo + read the source asset.
     openSearchRepo.grantPullPush(project);
     source.grantRead(project);
+
+    // Allow the build to authenticate to ECR Public to pull the base image
+    // (public.ecr.aws/docker/library/python). GetAuthorizationToken has no
+    // resource-level scoping, so "*" is required by the API.
+    project.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["ecr-public:GetAuthorizationToken", "sts:GetServiceBearerToken"],
+        resources: ["*"],
+      }),
+    );
 
     this.openSearchImageUri = `${registry}/${OPENSEARCH_MCP_REPO}:latest`;
     this.projectName = project.projectName;

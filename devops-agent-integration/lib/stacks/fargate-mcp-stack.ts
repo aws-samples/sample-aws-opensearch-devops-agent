@@ -402,16 +402,20 @@ export class FargateMcpStack extends cdk.Stack {
         parameters: { CertificateArn: new cr.PhysicalResourceIdReference() },
       },
       policy: cr.AwsCustomResourcePolicy.fromStatements([
+        // ImportCertificate mints a NEW ARN, so it cannot be resource-scoped ahead
+        // of the call — "*" is required by the API.
         new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
-          // ImportCertificate mints a NEW ARN, so it cannot be resource-scoped
-          // ahead of time; Delete/AddTags are on the same imported cert.
-          actions: [
-            "acm:ImportCertificate",
-            "acm:DeleteCertificate",
-            "acm:AddTagsToCertificate",
-          ],
+          actions: ["acm:ImportCertificate"],
           resources: ["*"],
+        }),
+        // Delete/AddTags act on an already-known certificate — scope them to this
+        // account/region's ACM certificates (the specific cert id is only known at
+        // runtime, but this bounds the blast radius to ACM certs we could have made).
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["acm:DeleteCertificate", "acm:AddTagsToCertificate"],
+          resources: [`arn:aws:acm:${this.region}:${this.account}:certificate/*`],
         }),
       ]),
     });
