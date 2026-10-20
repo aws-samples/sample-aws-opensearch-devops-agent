@@ -3,11 +3,24 @@
 Run top-to-bottom in one terminal. Values set with `export` are reused by later steps.
 Full details/troubleshooting: [prerequisites-and-deployment.md](prerequisites-and-deployment.md).
 
+> **Run everything from your local machine; commands act on AWS via API/CDK/SSM. The only non-terminal step is creating the webhook in the DevOps Agent console (Step 7).**
+
 **Prerequisites:** an AWS account (admin creds) in a Region where **AWS DevOps Agent** is
 available; **Node.js 18+, AWS CDK v2, AWS CLI v2, python3**
 
 
 ---
+
+### 0. Authenticate to AWS (do this first; Step 2 verifies it)
+Sign in however your account hands out access — then the `aws sts get-caller-identity` check in
+Step 2 confirms it worked.
+- **IAM Identity Center / SSO:** `aws configure sso` (one-time), then `aws sso login --profile <name>` and `export AWS_PROFILE=<name>`
+- **Access keys:** `aws configure` (paste Access Key ID + Secret)
+- **Temporary creds:** `export AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… AWS_SESSION_TOKEN=…`
+- **AWS CloudShell:** already signed in — skip
+
+> If `aws sts get-caller-identity` later errors with `Unable to locate credentials` or
+> `ExpiredToken`, you're not signed in — come back and do this step.
 
 ### 1. Get the code + generate the internal TLS cert
 ```bash
