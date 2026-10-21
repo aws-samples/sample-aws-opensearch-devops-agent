@@ -10,6 +10,10 @@ Full details/troubleshooting: [prerequisites-and-deployment.md](prerequisites-an
 **Prerequisites:** an AWS account (admin creds) in a Region where **AWS DevOps Agent** is
 available; **Node.js 18+, AWS CDK v2, AWS CLI v2, python3**
 
+> **Time:** end-to-end is roughly **60–90 min**, almost all of it spent waiting on AWS
+> (the OpenSearch domain in Step 3 and the Fargate MCP service in Step 6 are the long poles).
+> Per-step estimates are noted at each deploy below.
+
 
 ---
 
@@ -35,7 +39,7 @@ bash mcp-servers/tls/generate.sh
 > Every `cdk` command reads it at synth time, and it is git-ignored (never commit the private
 > key), so run it once before any `cdk` command below.
 
-### 2. Set account/Region + bootstrap
+### 2. Set account/Region + bootstrap  ·  ⏱ ~1–2 min (seconds if already bootstrapped)
 ```bash
 export CDK_DEFAULT_ACCOUNT=<account-id>
 export CDK_DEFAULT_REGION=<region>
@@ -46,13 +50,16 @@ cdk bootstrap aws://$CDK_DEFAULT_ACCOUNT/$CDK_DEFAULT_REGION
 > `aws sts get-caller-identity` must show YOUR account before you continue. If you sign in with a
 > named profile, run `export AWS_PROFILE=<profile>` before these commands.
 
-### 3. Deploy the platform (Part 1) and capture its coordinates
+### 3. Deploy the platform (Part 1) and capture its coordinates  ·  ⏱ ~25–40 min
 Deploy the upstream OpenSearch **observability-stack** fully, into a VPC (this creates the
 domain, **AMP workspace**, OSIS pipeline, and **OTel demo EC2 host**) — guided deploy docs:
 https://observability.opensearch.org/docs/deploy/aws/
 ```bash
 npx @opensearch-project/observability-stack
 ```
+> ⏱ The OpenSearch domain alone takes ~10–15 min to go active (the long pole); the full
+> platform install is ~25–40 min, and demo telemetry then takes a further ~10–15 min to start
+> appearing in the indices.
 > Supply-chain note: `npx` fetches the latest published `@opensearch-project/observability-stack`
 > at runtime. This upstream installer runs an **interactive guided deployment** where the
 > OpenSearch version and components are selected in the steps *after* the `npx` invocation, so
@@ -90,7 +97,7 @@ echo "$DOMAIN_HOST | vpc=$OBS_VPC_ID | subnets=$OBS_SUBNETS | amp=$AMP_WS_ID | d
 > if `vpc=`/`subnets=` are empty, **stop** and fix before Step 6, because an empty `OBS_*` makes
 > the deploy silently fall back to placeholder IDs like `vpc-0123456789abcdef0` and fail.
 
-### 4. Build the MCP image (CodeBuild)
+### 4. Build the MCP image (CodeBuild)  ·  ⏱ ~2 min deploy + ~3–6 min image build
 ```bash
 cdk deploy DevOpsAgent-Build --require-approval never
 aws codebuild start-build --project-name devops-agent-mcp-build --region "$AWS_REGION"
@@ -109,9 +116,12 @@ aws secretsmanager create-secret --name devops-agent/webhook-hmac \
   || echo "secret already exists — ok"
 ```
 
-### 6. Deploy detection + agent (Part 2)
+### 6. Deploy detection + agent (Part 2)  ·  ⏱ ~20–30 min
 This creates the Signal Bridge, the MCP Services, and the Agent Space
 `devops-agent-incident-response`:
+> ⏱ Breakdown: Shared ~1 min, SignalBridge ~2 min, **FargateMcp ~10–15 min** (NLB + ECS task
+> reaching healthy — the long pole), Integration ~2–5 min (the `AWS::DevOpsAgent::Service`
+> live handshake).
 ```bash
 cdk deploy --all \
   -c obsVpcId=$OBS_VPC_ID -c obsSubnetIds=$OBS_SUBNETS -c obsAvailabilityZones=$OBS_AZS \
@@ -132,7 +142,7 @@ cdk deploy --all \
 > ```
 > then re-run the Step 6 deploy.
 
-### 7. Create the webhook on the Agent Space, then wire it in
+### 7. Create the webhook on the Agent Space, then wire it in  ·  ⏱ ~2–3 min (SignalBridge redeploy)
 In the **AWS DevOps Agent** console, open the Agent Space **`devops-agent-incident-response`**
 (created in Step 6) → add an **Agent Space Webhook** with **HMAC** auth. Copy its two values,
 store the secret, and redeploy the Signal Bridge with the real URL.
@@ -154,7 +164,7 @@ cdk deploy DevOpsAgent-SignalBridge \
   -c fgacMasterRoleArn=$FGAC_MASTER_ROLE_ARN --require-approval never
 ```
 
-### 8. Register monitors + FGAC + AMP rules (once)
+### 8. Register monitors + FGAC + AMP rules (once)  ·  ⏱ ~1–2 min
 ```bash
 export SNS_TOPIC_ARN=$(aws cloudformation describe-stack-resources --stack-name DevOpsAgent-SignalBridge --region "$AWS_REGION" \
   --query "StackResources[?ResourceType=='AWS::SNS::Topic'].PhysicalResourceId | [0]" --output text)
@@ -184,7 +194,7 @@ Within ~1–5 min an investigation appears in the DevOps Agent console (Agent Sp
 FLAG=paymentFailure INSTANCE_ID=$DEMO_INSTANCE_ID bash ./scenarios/reset-flag.sh
 ```
 
-### 11. Clean up
+### 11. Clean up  ·  ⏱ ~15–25 min (Part 2) + ~15–20 min (Part 1 teardown)
 ```bash
 cdk destroy --all
 aws secretsmanager delete-secret --secret-id devops-agent/webhook-hmac --force-delete-without-recovery --region "$AWS_REGION"
