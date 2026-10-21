@@ -60,25 +60,35 @@ npx @opensearch-project/observability-stack
 > installer package itself to a known-good release, append a version — `npx
 > @opensearch-project/observability-stack@<version>`.
 
-Then capture coordinates (you type only these two):
+#### Get the FGAC master role ARN
+The upstream observability-stack installer creates the domain's FGAC master as an **IAM role**
+(the demo host's role); the AWS OpenSearch API does not expose it. Retrieve it from the **IAM
+console**: open **IAM → Roles**, search your domain name (e.g. `obs-stack-1792…`), and select
+the role whose name ends in **`-ec2-demo-role`**. Its ARN is your `FGAC_MASTER_ROLE_ARN` —
+`arn:aws:iam::<account-id>:role/obs-stack-<id>-ec2-demo-role`.
+
+Then capture coordinates. Fill in the **first two** `export`s (your domain name, and the ARN
+from the step above); the rest auto-populate:
 ```bash
 export DOMAIN_NAME=<opensearch-domain-name>
-export FGAC_MASTER_ROLE_ARN=<domain-master-role-arn>
+export FGAC_MASTER_ROLE_ARN=<domain-fgac-master-role-arn>
 
-read -r DOMAIN_HOST DOMAIN_ARN OBS_VPC_ID OBS_SG OBS_SUBNETS OBS_AZS <<<"$(
-  aws opensearch describe-domain --domain-name "$DOMAIN_NAME" --region "$AWS_REGION" \
-    --query 'DomainStatus.[Endpoints.vpc, ARN, VPCOptions.VPCId, join(`,`,VPCOptions.SecurityGroupIds), join(`,`,VPCOptions.SubnetIds), join(`,`,VPCOptions.AvailabilityZones)]' --output text)"
-export DOMAIN_HOST DOMAIN_ARN OBS_VPC_ID OBS_SG OBS_SUBNETS OBS_AZS
+export DOMAIN_HOST=$(aws opensearch describe-domain --domain-name "$DOMAIN_NAME" --region "$AWS_REGION" --query 'DomainStatus.Endpoints.vpc' --output text)
+export DOMAIN_ARN=$(aws opensearch describe-domain --domain-name "$DOMAIN_NAME" --region "$AWS_REGION" --query 'DomainStatus.ARN' --output text)
+export OBS_VPC_ID=$(aws opensearch describe-domain --domain-name "$DOMAIN_NAME" --region "$AWS_REGION" --query 'DomainStatus.VPCOptions.VPCId' --output text)
+export OBS_SG=$(aws opensearch describe-domain --domain-name "$DOMAIN_NAME" --region "$AWS_REGION" --query 'DomainStatus.VPCOptions.SecurityGroupIds' --output text | tr '\t' ',')
+export OBS_SUBNETS=$(aws opensearch describe-domain --domain-name "$DOMAIN_NAME" --region "$AWS_REGION" --query 'DomainStatus.VPCOptions.SubnetIds' --output text | tr '\t' ',')
+export OBS_AZS=$(aws opensearch describe-domain --domain-name "$DOMAIN_NAME" --region "$AWS_REGION" --query 'DomainStatus.VPCOptions.AvailabilityZones' --output text | tr '\t' ',')
 export AMP_WS_ID=$(aws amp list-workspaces --region "$AWS_REGION" --query 'workspaces[0].workspaceId' --output text)
 export AMP_WS_ARN=$(aws amp list-workspaces --region "$AWS_REGION" --query 'workspaces[0].arn' --output text)
-export DEMO_INSTANCE_ID=$(aws ec2 describe-instances --region "$AWS_REGION" \
-  --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=*bservability*,*otel*,*demo*" \
-  --query 'Reservations[0].Instances[0].InstanceId' --output text)
+export DEMO_INSTANCE_ID=$(aws ec2 describe-instances --region "$AWS_REGION" --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=*bservability*,*otel*,*demo*" --query 'Reservations[0].Instances[0].InstanceId' --output text)
 
-echo "$DOMAIN_HOST | amp=$AMP_WS_ID | demo=$DEMO_INSTANCE_ID"
+echo "$DOMAIN_HOST | vpc=$OBS_VPC_ID | subnets=$OBS_SUBNETS | amp=$AMP_WS_ID | demo=$DEMO_INSTANCE_ID"
 ```
-> Any of those three values may print empty or `None` — that is expected if the matching
-> resource is not present.
+> Each value is fetched on its own single line — no backticks, no `\` line-continuations, no
+> `read` heredoc — so the block survives copy-paste into zsh. Verify the echo shows real values:
+> if `vpc=`/`subnets=` are empty, **stop** and fix before Step 6, because an empty `OBS_*` makes
+> the deploy silently fall back to placeholder IDs like `vpc-0123456789abcdef0` and fail.
 
 ### 4. Build the MCP image (CodeBuild)
 ```bash
