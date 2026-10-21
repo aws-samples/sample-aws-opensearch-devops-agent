@@ -168,6 +168,20 @@ export MCP_TASK_ROLE_ARN=$(aws iam get-role --role-name "$OS_ROLE" --query Role.
 
 DEMO_INSTANCE_ID=$DEMO_INSTANCE_ID REGION=$AWS_REGION DOMAIN_HOST=$DOMAIN_HOST SNS_TOPIC_ARN=$SNS_TOPIC_ARN MCP_TASK_ROLE_ARN=$MCP_TASK_ROLE_ARN AMP_WORKSPACE_ID=$AMP_WS_ID FGAC_MASTER_ROLE_ARN=$FGAC_MASTER_ROLE_ARN bash ./scenarios/register-from-host.sh
 ```
+> **This step needs OpenSearch FGAC admin on the domain.** The OpenSearch calls are signed with
+> the identity the script resolves: it assumes `FGAC_MASTER_ROLE_ARN` if it can, otherwise it
+> falls back to your *current* credentials (you'll see a `WARN: could not assume …` line — that's
+> fine **if** your caller is itself an FGAC master). Either way, that identity must be mapped to
+> OpenSearch's **`all_access`** role on the domain — normally the admin identity that deployed
+> Part 1.
+>
+> If Step 8 fails with **403** / *"no permissions for [cluster:admin/...]"* on the security or
+> monitor calls, your principal isn't an FGAC master. Fix it one of two ways, then re-run Step 8:
+> - **Map your principal** using an existing master: OpenSearch UI → **Security → Roles →
+>   `all_access` → Mapped users → Manage mapping** → add your IAM role ARN as a **backend role**.
+> - **Or** set `FGAC_MASTER_ROLE_ARN` to a master role your caller *can* assume (its trust policy
+>   must allow your principal — an EC2 instance role like `…-ec2-demo-role` does **not**, which is
+>   why assuming it warns and falls back).
 
 ### 9. Verify
 ```bash
