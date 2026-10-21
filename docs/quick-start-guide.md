@@ -26,8 +26,8 @@ Step 2 confirms it worked.
 
 ### 1. Get the code + generate the internal TLS cert
 ```bash
-git clone <this-repo-url>
-cd autonomous-monitoring-opensearch-devops-agent/devops-agent-integration
+git clone https://github.com/aws-samples/sample-aws-opensearch-devops-agent.git
+cd sample-aws-opensearch-devops-agent/devops-agent-integration
 npm install
 bash mcp-servers/tls/generate.sh
 ```
