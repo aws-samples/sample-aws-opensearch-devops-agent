@@ -40,11 +40,14 @@ bash mcp-servers/tls/generate.sh
 export CDK_DEFAULT_ACCOUNT=<account-id>
 export CDK_DEFAULT_REGION=<region>
 export AWS_REGION=$CDK_DEFAULT_REGION AWS_DEFAULT_REGION=$CDK_DEFAULT_REGION
+export AWS_PAGER=""
 aws sts get-caller-identity
 cdk bootstrap aws://$CDK_DEFAULT_ACCOUNT/$CDK_DEFAULT_REGION
 ```
 > `aws sts get-caller-identity` must show YOUR account before you continue. If you sign in with a
 > named profile, run `export AWS_PROFILE=<profile>` before these commands.
+> `export AWS_PAGER=""` stops the AWS CLI v2 from piping long output (like `start-build`) into a
+> pager (`less`), which otherwise looks like the terminal has hung until you press `q`.
 
 ### 3. Deploy the platform (Part 1) and capture its coordinates
 **Estimated time: ~25–40 min.** The OpenSearch domain alone takes ~10–15 min to go active (the
@@ -97,8 +100,7 @@ echo "$DOMAIN_HOST | vpc=$OBS_VPC_ID | subnets=$OBS_SUBNETS | amp=$AMP_WS_ID | d
 **Estimated time: ~2 min deploy + ~3–6 min image build.**
 ```bash
 cdk deploy DevOpsAgent-Build --require-approval never
-aws codebuild start-build --project-name devops-agent-mcp-build --region "$AWS_REGION"
-BID=$(aws codebuild list-builds-for-project --project-name devops-agent-mcp-build --region "$AWS_REGION" --query "ids[0]" --output text)
+BID=$(aws codebuild start-build --project-name devops-agent-mcp-build --region "$AWS_REGION" --query 'build.id' --output text)
 aws codebuild batch-get-builds --ids "$BID" --region "$AWS_REGION" --query "builds[0].buildStatus" --output text
 ```
 > The last command prints the build status. Wait until it reports `SUCCEEDED` before continuing.
