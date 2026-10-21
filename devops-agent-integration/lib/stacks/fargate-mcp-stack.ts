@@ -205,8 +205,24 @@ export class FargateMcpStack extends cdk.Stack {
       this,
       "McpSecurityGroup",
       props.securityGroupId,
-      // The SG is not owned by this stack; do not let CDK mutate its rules.
-      { mutable: false },
+      // Import mutable so this stack can GUARANTEE the intra-SG mesh the private
+      // front door depends on (see the self-referencing rule below). CDK emits a
+      // standalone AWS::EC2::SecurityGroupIngress resource rather than editing the
+      // SG inline, so it does not disturb rules the observability stack owns.
+      { mutable: true },
+    );
+
+    // The NLB (TLS 8443), the Fargate task (TCP 8000), the DevOps Agent
+    // PrivateConnection, and the OpenSearch domain all sit in this shared SG, so
+    // the front door only works if its members can reach each other. A clean
+    // observability-stack SG ships an allow-all-from-self rule that provides this;
+    // a reused or rule-stripped SG may not — which breaks the NLB health check on
+    // 8000 and the agent's TLS handshake to .../mcp on 8443. Ensure it explicitly
+    // rather than assuming the imported SG already has it.
+    securityGroup.addIngressRule(
+      securityGroup,
+      ec2.Port.allTraffic(),
+      "MCP intra-SG mesh: agent->NLB:8443, NLB->task:8000, task->domain:443",
     );
 
     const vpcSubnets: ec2.SubnetSelection = {
