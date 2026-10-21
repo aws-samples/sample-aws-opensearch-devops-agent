@@ -198,6 +198,14 @@ Within ~1–5 min an investigation appears in the DevOps Agent console (Agent Sp
 ```bash
 FLAG=paymentFailure INSTANCE_ID=$DEMO_INSTANCE_ID bash ./scenarios/reset-flag.sh
 ```
+> **Cost control.** Each fired alert starts a DevOps Agent investigation, which incurs
+> agent/model cost. Every monitor's notify action is **throttled to once per 60 min**, so a
+> sustained fault triggers at most ~1 investigation per monitor per hour — not one per
+> evaluation. Still: **reset the fault** (above) once you've seen the investigation so it doesn't
+> keep re-firing each hour, and note the **standing infrastructure** (OpenSearch domain, the
+> Fargate MCP tasks + NLB, the demo EC2 host, AMP/OSIS) bills continuously until you run the
+> Step 11 cleanup. Also keep the fault-panel's real-LLM mode **off** unless you intend to incur
+> Amazon Bedrock model-invocation cost (see [demo-scenarios.md](demo-scenarios.md)).
 
 ### 11. Clean up
 ```bash
