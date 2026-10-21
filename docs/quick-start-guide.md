@@ -152,8 +152,7 @@ its HMAC signing key, then run:
 ```bash
 export WEBHOOK_URL='https://...'
 export HMAC_SECRET='...'
-aws secretsmanager put-secret-value --secret-id devops-agent/webhook-hmac \
-  --region "$AWS_REGION" --secret-string "$HMAC_SECRET"
+aws secretsmanager put-secret-value --secret-id devops-agent/webhook-hmac --region "$AWS_REGION" --secret-string "$HMAC_SECRET"
 
 cdk deploy DevOpsAgent-SignalBridge \
   -c obsVpcId=$OBS_VPC_ID -c obsSubnetIds=$OBS_SUBNETS -c obsAvailabilityZones=$OBS_AZS \
@@ -163,6 +162,12 @@ cdk deploy DevOpsAgent-SignalBridge \
   -c ampWorkspaceArn=$AMP_WS_ARN -c devopsAgentWebhookUrl=$WEBHOOK_URL \
   -c fgacMasterRoleArn=$FGAC_MASTER_ROLE_ARN --require-approval never
 ```
+> Confirm the secret actually stored (not still the Step 5 placeholder), or the agent will
+> reject the bridge's webhooks on HMAC verification:
+> ```bash
+> aws secretsmanager get-secret-value --secret-id devops-agent/webhook-hmac --query SecretString --output text
+> ```
+> It must print your HMAC key, not `placeholder`.
 
 ### 8. Register monitors + FGAC + AMP rules (once)
 ```bash
