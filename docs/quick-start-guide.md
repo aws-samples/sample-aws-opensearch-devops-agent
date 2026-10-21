@@ -196,25 +196,25 @@ aws secretsmanager delete-secret --secret-id devops-agent/webhook-hmac --force-d
 
 ## Observing the loop (dashboards, fault injection, alert → investigation)
 
-Use this around Steps 9–10 (before you clean up in Step 11). The OpenSearch domain and the
-demo app are **VPC-private** — there are no public endpoints, so you reach the UIs by AWS
-Systems Manager port-forwarding from the demo host (`$DEMO_INSTANCE_ID`). Full catalog:
-[demo-scenarios.md](demo-scenarios.md).
+Use this around Steps 9–10 (before you clean up in Step 11). The OpenSearch domain is viewed
+through the managed **OpenSearch UI application** (a public, AWS-managed endpoint). The demo app
+(`flagd`, fault-panel) is **VPC-private**, so you reach it by AWS Systems Manager port-forwarding
+from the demo host (`$DEMO_INSTANCE_ID`). Full catalog: [demo-scenarios.md](demo-scenarios.md).
 
-### 1. Open OpenSearch Dashboards (OpenSearch UI)
-The observability-stack provisions the managed **OpenSearch UI / Application** as the intended
-entry point — see the upstream deploy docs (https://observability.opensearch.org/docs/deploy/aws/)
-for its console URL. To reach the domain's Dashboards directly from your laptop, tunnel to the
-VPC-private endpoint through the demo host, then open it locally:
+### 1. Open the OpenSearch UI application
+The observability-stack provisions a managed **OpenSearch UI application** (its name matches your
+domain, e.g. `obs-stack-<id>`) that serves OpenSearch Dashboards against the VPC-private domain
+over a public, AWS-managed endpoint — so you do **not** tunnel to the cluster's own OpenSearch
+Dashboards. Open it from the AWS console: **Amazon OpenSearch Service → OpenSearch UI**
+(Applications) → select the application for your domain → **Open**. It authenticates with your
+IAM identity.
+
+To get the endpoint URL directly:
 ```bash
-aws ssm start-session --target "$DEMO_INSTANCE_ID" \
-  --document-name AWS-StartPortForwardingSessionToRemoteHost \
-  --parameters "{\"host\":[\"$DOMAIN_HOST\"],\"portNumber\":[\"443\"],\"localPortNumber\":[\"8443\"]}"
+aws opensearch list-applications --region "$AWS_REGION" \
+  --query "ApplicationSummaries[?name=='$DOMAIN_NAME'].endpoint" --output text
 ```
-Then browse to **https://localhost:8443/_dashboards** and accept the TLS warning (the
-certificate is for the domain host, not `localhost`).
-> Because the domain uses IAM-based FGAC (no local master password), the managed OpenSearch UI
-> is the smoothest sign-in path; the raw tunnel above is the direct alternative.
+→ open that `https://application-<domain>-<id>.<region>.opensearch.amazonaws.com` URL in your browser.
 
 ### 2. Inject a fault via feature flag
 Faults in the OTel Astronomy Shop are driven by `flagd`. Two ways:
@@ -235,7 +235,7 @@ Faults in the OTel Astronomy Shop are driven by `flagd`. Two ways:
 ### 3. See the alert trigger and the investigation start
 Allow ~1–5 min — monitors evaluate a rolling 5-minute window on a 1-minute schedule.
 
-- **In OpenSearch Dashboards:** left menu → **OpenSearch Plugins → Alerting → Monitors →
+- **In the OpenSearch UI application:** left menu → **OpenSearch Plugins → Alerting → Monitors →
   `M-logs-error-rate`**. When the payment/checkout error rate crosses 5%, the
   `error-rate-over-5pct` trigger flips to **Active** and an entry appears in the monitor's
   **Alerts** tab.
