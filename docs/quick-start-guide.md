@@ -208,12 +208,37 @@ FLAG=paymentFailure INSTANCE_ID=$DEMO_INSTANCE_ID bash ./scenarios/reset-flag.sh
 > Amazon Bedrock model-invocation cost (see [demo-scenarios.md](demo-scenarios.md)).
 
 ### 11. Clean up
+**Part 2 (this repo) is CloudFormation**, so `cdk destroy` removes it cleanly — including the
+Agent Space, its `AWS::DevOpsAgent::Service`/PrivateConnection, and the webhook you added in
+Step 7 (the webhook is attached to the Agent Space and is deleted with it):
 ```bash
 cdk destroy --all
 aws secretsmanager delete-secret --secret-id devops-agent/webhook-hmac --force-delete-without-recovery --region "$AWS_REGION"
 ```
-> Then delete the Agent Space Webhook (Step 7) in the console, and tear down the Part 1
-> observability-stack.
+> There is **no AWS CLI for the DevOps Agent service**, so the webhook/Agent Space has no direct
+> delete command — but `cdk destroy --all` deletes the Agent Space that owns the webhook. If the
+> DevOps Agent console still shows a leftover Agent Space or webhook afterward, remove it there.
+
+**Part 1 (the observability-stack) is NOT CloudFormation** — the upstream installer created it, so
+`cdk destroy` does not touch it. Preferred teardown is the installer's own destroy flow (see
+https://observability.opensearch.org/docs/deploy/aws/). To delete the main resources directly
+instead, make sure the Step 3 coordinates are still set in this terminal (re-run Step 3's capture
+block if this is a fresh shell), confirm they're non-empty, then delete:
+```bash
+echo "domain=$DOMAIN_NAME amp=$AMP_WS_ID demo=$DEMO_INSTANCE_ID"
+aws osis delete-pipeline --pipeline-name "$DOMAIN_NAME" --region "$AWS_REGION"
+aws opensearch delete-domain --domain-name "$DOMAIN_NAME" --region "$AWS_REGION"
+aws amp delete-workspace --workspace-id "$AMP_WS_ID" --region "$AWS_REGION"
+aws ec2 terminate-instances --instance-ids "$DEMO_INSTANCE_ID" --region "$AWS_REGION"
+APP_ID=$(aws opensearch list-applications --region "$AWS_REGION" --query "ApplicationSummaries[?name=='$DOMAIN_NAME'].id | [0]" --output text)
+[ -n "$APP_ID" ] && [ "$APP_ID" != "None" ] && aws opensearch delete-application --id "$APP_ID" --region "$AWS_REGION"
+```
+> The `echo` line must show real values before you run the deletes — an empty `$DOMAIN_NAME`
+> would make these error (harmless) or target nothing. The installer may also leave IAM roles
+> (`obs-stack-<id>-connected-data-source-prometheus-role`, `-ec2-demo-role`, `-osi-role`) and a
+> demo security group behind; delete those once the domain/pipeline/host are gone if you want the
+> account fully clean. Deploying the observability-stack more than once in the same VPC is what
+> causes those to pile up and share/strip security groups — keep it to one deployment per VPC.
 
 ---
 
