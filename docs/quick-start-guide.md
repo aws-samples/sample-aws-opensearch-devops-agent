@@ -191,3 +191,67 @@ aws secretsmanager delete-secret --secret-id devops-agent/webhook-hmac --force-d
 ```
 > Then delete the Agent Space Webhook (Step 7) in the console, and tear down the Part 1
 > observability-stack.
+
+---
+
+## Observing the loop (dashboards, fault injection, alert → investigation)
+
+Use this around Steps 9–10 (before you clean up in Step 11). The OpenSearch domain and the
+demo app are **VPC-private** — there are no public endpoints, so you reach the UIs by AWS
+Systems Manager port-forwarding from the demo host (`$DEMO_INSTANCE_ID`). Full catalog:
+[demo-scenarios.md](demo-scenarios.md).
+
+### 1. Open OpenSearch Dashboards (OpenSearch UI)
+The observability-stack provisions the managed **OpenSearch UI / Application** as the intended
+entry point — see the upstream deploy docs (https://observability.opensearch.org/docs/deploy/aws/)
+for its console URL. To reach the domain's Dashboards directly from your laptop, tunnel to the
+VPC-private endpoint through the demo host, then open it locally:
+```bash
+aws ssm start-session --target "$DEMO_INSTANCE_ID" \
+  --document-name AWS-StartPortForwardingSessionToRemoteHost \
+  --parameters "{\"host\":[\"$DOMAIN_HOST\"],\"portNumber\":[\"443\"],\"localPortNumber\":[\"8443\"]}"
+```
+Then browse to **https://localhost:8443/_dashboards** and accept the TLS warning (the
+certificate is for the domain host, not `localhost`).
+> Because the domain uses IAM-based FGAC (no local master password), the managed OpenSearch UI
+> is the smoothest sign-in path; the raw tunnel above is the direct alternative.
+
+### 2. Inject a fault via feature flag
+Faults in the OTel Astronomy Shop are driven by `flagd`. Two ways:
+- **Script (same as Step 10):**
+  ```bash
+  FLAG=paymentFailure VARIANT=100% INSTANCE_ID=$DEMO_INSTANCE_ID bash ./scenarios/induce-flag.sh
+  ```
+- **flagd UI** — port-forward the frontend proxy and open the `/feature` page:
+  ```bash
+  aws ssm start-session --target "$DEMO_INSTANCE_ID" \
+    --document-name AWS-StartPortForwardingSession \
+    --parameters '{"portNumber":["8080"],"localPortNumber":["8080"]}'
+  ```
+  → open **http://localhost:8080/feature**, set `paymentFailure` to the **`100%`** variant.
+  This drives the `M-logs-error-rate` monitor. (The GenAI travel-planner uses a separate
+  fault-panel on `:8085` — see [demo-scenarios.md](demo-scenarios.md).)
+
+### 3. See the alert trigger and the investigation start
+Allow ~1–5 min — monitors evaluate a rolling 5-minute window on a 1-minute schedule.
+
+- **In OpenSearch Dashboards:** left menu → **OpenSearch Plugins → Alerting → Monitors →
+  `M-logs-error-rate`**. When the payment/checkout error rate crosses 5%, the
+  `error-rate-over-5pct` trigger flips to **Active** and an entry appears in the monitor's
+  **Alerts** tab.
+- **Confirm the Signal Bridge delivered the alert to the agent:**
+  ```bash
+  FN=$(aws cloudformation describe-stack-resources --stack-name DevOpsAgent-SignalBridge --region "$AWS_REGION" \
+    --query "StackResources[?ResourceType=='AWS::Lambda::Function'].PhysicalResourceId | [0]" --output text)
+  aws logs filter-log-events --log-group-name "/aws/lambda/${FN}" --region "$AWS_REGION" \
+    --start-time $(( ($(date +%s) - 900) * 1000 )) --query "events[].message" --output text | grep delivered
+  ```
+  → a `{"event":"delivered",...,"httpStatus":200}` line.
+- **In the AWS DevOps Agent console:** open Agent Space **`devops-agent-incident-response`** →
+  **Investigations**. Within ~1–5 min of the alert, a new investigation appears and the agent
+  begins pulling evidence through the MCP servers.
+
+Reset the fault when done:
+```bash
+FLAG=paymentFailure INSTANCE_ID=$DEMO_INSTANCE_ID bash ./scenarios/reset-flag.sh
+```
