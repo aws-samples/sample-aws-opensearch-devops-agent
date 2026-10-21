@@ -222,7 +222,9 @@ export class FargateMcpStack extends cdk.Stack {
     securityGroup.addIngressRule(
       securityGroup,
       ec2.Port.allTraffic(),
-      "MCP intra-SG mesh: agent->NLB:8443, NLB->task:8000, task->domain:443",
+      // NOTE: EC2 SG rule descriptions reject '>' (allowed set: a-zA-Z0-9. _-:/()#,@[]+=&;{}!$*),
+      // so this is worded without arrows.
+      "MCP intra-SG mesh: agent to NLB 8443, NLB to task 8000, task to domain 443",
     );
 
     const vpcSubnets: ec2.SubnetSelection = {
