@@ -28,7 +28,7 @@
  *     Lambda's own execution role least-privilege while still signing as the master.
  *
  * The AWS SDK is only referenced lazily (for the optional STS assume) and is
- * provided by the Node.js 20 Lambda runtime, so the pure signing/request core has
+ * provided by the Node.js 24 Lambda runtime, so the pure signing/request core has
  * no external dependency and can be reasoned about in isolation. SigV4 is
  * implemented with Node's built-in `crypto` to avoid adding SDK dependencies to
  * the CDK project.

@@ -8,7 +8,7 @@
  *
  *   - SNS topic `devops-agent-alerts` — the fan-in point the OpenSearch Alerting
  *     monitors and the AMP Alertmanager notify when they transition to triggered.
- *   - In-VPC translator Lambda (Node.js 20) fronted by the SNS topic. It parses the
+ *   - In-VPC translator Lambda (Node.js 24) fronted by the SNS topic. It parses the
  *     envelope, normalizes it into the DevOps Agent incident payload, HMAC-signs it,
  *     and POSTs it to the webhook. The handler lives at `lib/signal-bridge/handler.ts`.
  *   - SQS DLQ `devops-agent-alerts-dlq`. It is wired **both** as the Lambda's
@@ -38,7 +38,7 @@
  * {@link NodejsFunction} pointing directly at the TypeScript handler. NodejsFunction
  * transpiles/bundles the handler with esbuild at synth time (falling back to Docker
  * when esbuild is not installed locally). The handler's only runtime dependency,
- * `@aws-sdk/client-secrets-manager`, is provided by the Node.js 20 Lambda runtime and
+ * `@aws-sdk/client-secrets-manager`, is provided by the Node.js 24 Lambda runtime and
  * is therefore marked external so it is not bundled.
  *
  * _Requirements: 1.4, 1.5, 6.1, 6.2, 6.4_
@@ -212,13 +212,13 @@ export class SignalBridgeStack extends cdk.Stack {
     });
 
     // -----------------------------------------------------------------------
-    // In-VPC translator Lambda (Node.js 20), entry = lib/signal-bridge/handler.ts.
+    // In-VPC translator Lambda (Node.js 24), entry = lib/signal-bridge/handler.ts.
     // -----------------------------------------------------------------------
     this.translatorFunction = new NodejsFunction(this, "TranslatorFunction", {
       functionName: FUNCTION_NAME,
       description:
         "Signal_Bridge translator: normalize + HMAC-sign + deliver fired alerts to the DevOps Agent webhook (runs outside the VPC for Secrets Manager + webhook egress).",
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, "..", "signal-bridge", "handler.ts"),
       handler: "handler",
       role: this.executionRole,
@@ -237,7 +237,7 @@ export class SignalBridgeStack extends cdk.Stack {
       bundling: {
         // The AWS SDK v3 is on the Lambda runtime image — do not bundle it.
         externalModules: ["@aws-sdk/client-secrets-manager"],
-        target: "node20",
+        target: "node24",
         minify: false,
         sourceMap: true,
       },

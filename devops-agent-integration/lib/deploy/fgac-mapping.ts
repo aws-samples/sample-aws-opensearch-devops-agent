@@ -258,12 +258,12 @@ export class FgacRoleMapping extends Construct {
     );
 
     // -----------------------------------------------------------------------
-    // onEvent Lambda (Node.js 20), entry = lib/deploy/fgac-mapping.handler.ts.
+    // onEvent Lambda (Node.js 24), entry = lib/deploy/fgac-mapping.handler.ts.
     // -----------------------------------------------------------------------
     this.onEventFunction = new NodejsFunction(this, "OnEventFunction", {
       description:
         "FGAC role-mapping custom resource: create/update a read-only FGAC role and map the MCP execution role via the OpenSearch security API (SigV4/TLS).",
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, "fgac-mapping.handler.ts"),
       handler: "handler",
       role: executionRole,
@@ -275,9 +275,9 @@ export class FgacRoleMapping extends Construct {
       },
       bundling: {
         // AWS SDK v3 (only used lazily for the optional STS assume) is on the
-        // Node.js 20 Lambda runtime image — do not bundle it.
+        // Node.js 24 Lambda runtime image — do not bundle it.
         externalModules: ["@aws-sdk/client-sts"],
-        target: "node20",
+        target: "node24",
         minify: false,
         sourceMap: true,
       },

@@ -186,7 +186,7 @@ export class MonitorsDeployment extends Construct {
     this.handlerRole = props.role ?? this.createLeastPrivilegeRole(props, inVpc);
 
     // -----------------------------------------------------------------------
-    // Handler Lambda (Node.js 20). Runs in the domain's VPC when configured.
+    // Handler Lambda (Node.js 24). Runs in the domain's VPC when configured.
     // -----------------------------------------------------------------------
     const securityGroups =
       inVpc && props.securityGroupId
@@ -211,7 +211,7 @@ export class MonitorsDeployment extends Construct {
       functionName: HANDLER_FUNCTION_NAME,
       description:
         "Registers the OpenSearch Alerting monitors + AMP rule group / Alertmanager and wires them to the Signal_Bridge SNS topic (SigV4 over TLS).",
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, "monitors-deploy.handler.ts"),
       handler: "onEvent",
       role: this.handlerRole,
@@ -222,7 +222,7 @@ export class MonitorsDeployment extends Construct {
       securityGroups,
       vpcSubnets,
       bundling: {
-        target: "node20",
+        target: "node24",
         minify: false,
         sourceMap: true,
       },

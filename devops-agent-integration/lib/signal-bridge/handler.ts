@@ -446,7 +446,7 @@ function requireEnv(name: string): string {
 /**
  * Create the default Secrets Manager-backed secret fetcher.
  *
- * The AWS SDK v3 is provided by the Node.js 20 Lambda runtime, so it is required
+ * The AWS SDK v3 is provided by the Node.js 24 Lambda runtime, so it is required
  * lazily at call time. Keeping it behind this injectable means the pure handler
  * core and its tests need no AWS dependency.
  *
