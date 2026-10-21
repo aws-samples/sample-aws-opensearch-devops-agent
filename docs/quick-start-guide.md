@@ -7,6 +7,12 @@ Full details/troubleshooting: [prerequisites-and-deployment.md](prerequisites-an
 
 > **Fill in every `<...>` placeholder with your own value before running — don't paste the angle brackets.** In zsh/bash `<` and `>` are redirection operators, so a literal `<account-id>` throws a parse error instead of an obvious message.
 
+> **Each command is kept on a single line on purpose.** Copy one fenced block at a time. If your
+> prompt ever shows a leading `>` (the shell waiting for more input), press **Ctrl-C** before
+> pasting again — a stale continuation prompt silently corrupts the next paste. (Multi-line
+> commands joined with `\` are easy to break on paste, which can drop a flag and let a deploy
+> "succeed" with a missing value.)
+
 **Prerequisites:** an AWS account (admin creds) in a Region where **AWS DevOps Agent** is
 available; **Node.js 18+, AWS CDK v2, AWS CLI v2, python3**
 
@@ -110,9 +116,7 @@ The Part 2 stack **imports** this secret by name; its real value is set in Step 
 webhook exists). Create it now with a placeholder so the import resolves:
 ```bash
 export WEBHOOK_URL='https://placeholder.invalid/webhook'
-aws secretsmanager create-secret --name devops-agent/webhook-hmac \
-  --region "$AWS_REGION" --secret-string placeholder 2>/dev/null \
-  || echo "secret already exists — ok"
+aws secretsmanager create-secret --name devops-agent/webhook-hmac --region "$AWS_REGION" --secret-string placeholder 2>/dev/null || echo "secret already exists — ok"
 ```
 
 ### 6. Deploy detection + agent (Part 2)
@@ -123,14 +127,7 @@ aws secretsmanager create-secret --name devops-agent/webhook-hmac \
 This creates the Signal Bridge, the MCP Services, and the Agent Space
 `devops-agent-incident-response`:
 ```bash
-cdk deploy --all \
-  -c obsVpcId=$OBS_VPC_ID -c obsSubnetIds=$OBS_SUBNETS -c obsAvailabilityZones=$OBS_AZS \
-  -c obsSecurityGroupId=$OBS_SG -c opensearchEndpoint=$DOMAIN_HOST -c domainArn=$DOMAIN_ARN \
-  -c ampWorkspaceId=$AMP_WS_ID \
-  -c ampEndpoint=https://aps-workspaces.$AWS_REGION.amazonaws.com/workspaces/$AMP_WS_ID \
-  -c ampWorkspaceArn=$AMP_WS_ARN -c devopsAgentWebhookUrl=$WEBHOOK_URL \
-  -c fgacMasterRoleArn=$FGAC_MASTER_ROLE_ARN -c assignPublicIpForFargate=true \
-  --require-approval never
+cdk deploy --all -c obsVpcId=$OBS_VPC_ID -c obsSubnetIds=$OBS_SUBNETS -c obsAvailabilityZones=$OBS_AZS -c obsSecurityGroupId=$OBS_SG -c opensearchEndpoint=$DOMAIN_HOST -c domainArn=$DOMAIN_ARN -c ampWorkspaceId=$AMP_WS_ID -c ampEndpoint=https://aps-workspaces.$AWS_REGION.amazonaws.com/workspaces/$AMP_WS_ID -c ampWorkspaceArn=$AMP_WS_ARN -c devopsAgentWebhookUrl=$WEBHOOK_URL -c fgacMasterRoleArn=$FGAC_MASTER_ROLE_ARN -c assignPublicIpForFargate=true --require-approval never
 ```
 
 > **If Step 6 fails on `AWS::DevOpsAgent::Service`** with *"could not complete request
@@ -154,13 +151,7 @@ export WEBHOOK_URL='https://...'
 export HMAC_SECRET='...'
 aws secretsmanager put-secret-value --secret-id devops-agent/webhook-hmac --region "$AWS_REGION" --secret-string "$HMAC_SECRET"
 
-cdk deploy DevOpsAgent-SignalBridge \
-  -c obsVpcId=$OBS_VPC_ID -c obsSubnetIds=$OBS_SUBNETS -c obsAvailabilityZones=$OBS_AZS \
-  -c obsSecurityGroupId=$OBS_SG -c opensearchEndpoint=$DOMAIN_HOST -c domainArn=$DOMAIN_ARN \
-  -c ampWorkspaceId=$AMP_WS_ID \
-  -c ampEndpoint=https://aps-workspaces.$AWS_REGION.amazonaws.com/workspaces/$AMP_WS_ID \
-  -c ampWorkspaceArn=$AMP_WS_ARN -c devopsAgentWebhookUrl=$WEBHOOK_URL \
-  -c fgacMasterRoleArn=$FGAC_MASTER_ROLE_ARN --require-approval never
+cdk deploy DevOpsAgent-SignalBridge -c obsVpcId=$OBS_VPC_ID -c obsSubnetIds=$OBS_SUBNETS -c obsAvailabilityZones=$OBS_AZS -c obsSecurityGroupId=$OBS_SG -c opensearchEndpoint=$DOMAIN_HOST -c domainArn=$DOMAIN_ARN -c ampWorkspaceId=$AMP_WS_ID -c ampEndpoint=https://aps-workspaces.$AWS_REGION.amazonaws.com/workspaces/$AMP_WS_ID -c ampWorkspaceArn=$AMP_WS_ARN -c devopsAgentWebhookUrl=$WEBHOOK_URL -c fgacMasterRoleArn=$FGAC_MASTER_ROLE_ARN --require-approval never
 ```
 > Confirm the secret actually stored (not still the Step 5 placeholder), or the agent will
 > reject the bridge's webhooks on HMAC verification:
@@ -171,16 +162,11 @@ cdk deploy DevOpsAgent-SignalBridge \
 
 ### 8. Register monitors + FGAC + AMP rules (once)
 ```bash
-export SNS_TOPIC_ARN=$(aws cloudformation describe-stack-resources --stack-name DevOpsAgent-SignalBridge --region "$AWS_REGION" \
-  --query "StackResources[?ResourceType=='AWS::SNS::Topic'].PhysicalResourceId | [0]" --output text)
-OS_ROLE=$(aws cloudformation describe-stack-resources --stack-name DevOpsAgent-FargateMcp --region "$AWS_REGION" \
-  --query "StackResources[?ResourceType=='AWS::IAM::Role' && contains(LogicalResourceId,'OpenSearch')].PhysicalResourceId | [0]" --output text)
+export SNS_TOPIC_ARN=$(aws cloudformation describe-stack-resources --stack-name DevOpsAgent-SignalBridge --region "$AWS_REGION" --query "StackResources[?ResourceType=='AWS::SNS::Topic'].PhysicalResourceId | [0]" --output text)
+export OS_ROLE=$(aws cloudformation describe-stack-resources --stack-name DevOpsAgent-FargateMcp --region "$AWS_REGION" --query "StackResources[?ResourceType=='AWS::IAM::Role' && contains(LogicalResourceId,'OpenSearch')].PhysicalResourceId | [0]" --output text)
 export MCP_TASK_ROLE_ARN=$(aws iam get-role --role-name "$OS_ROLE" --query Role.Arn --output text)
 
-DEMO_INSTANCE_ID=$DEMO_INSTANCE_ID REGION=$AWS_REGION DOMAIN_HOST=$DOMAIN_HOST \
-SNS_TOPIC_ARN=$SNS_TOPIC_ARN MCP_TASK_ROLE_ARN=$MCP_TASK_ROLE_ARN \
-AMP_WORKSPACE_ID=$AMP_WS_ID FGAC_MASTER_ROLE_ARN=$FGAC_MASTER_ROLE_ARN \
-  bash ./scenarios/register-from-host.sh
+DEMO_INSTANCE_ID=$DEMO_INSTANCE_ID REGION=$AWS_REGION DOMAIN_HOST=$DOMAIN_HOST SNS_TOPIC_ARN=$SNS_TOPIC_ARN MCP_TASK_ROLE_ARN=$MCP_TASK_ROLE_ARN AMP_WORKSPACE_ID=$AMP_WS_ID FGAC_MASTER_ROLE_ARN=$FGAC_MASTER_ROLE_ARN bash ./scenarios/register-from-host.sh
 ```
 
 ### 9. Verify
