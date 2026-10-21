@@ -5,6 +5,8 @@ Full details/troubleshooting: [prerequisites-and-deployment.md](prerequisites-an
 
 > **Run everything from your local machine; commands act on AWS via API/CDK/SSM. The only non-terminal step is creating the webhook in the DevOps Agent console (Step 7).**
 
+> **Fill in every `<...>` placeholder with your own value before running — don't paste the angle brackets.** In zsh/bash `<` and `>` are redirection operators, so a literal `<account-id>` throws a parse error instead of an obvious message.
+
 **Prerequisites:** an AWS account (admin creds) in a Region where **AWS DevOps Agent** is
 available; **Node.js 18+, AWS CDK v2, AWS CLI v2, python3**
 
@@ -27,27 +29,29 @@ Step 2 confirms it worked.
 git clone <this-repo-url>
 cd autonomous-monitoring-opensearch-devops-agent/devops-agent-integration
 npm install
-# Generate the self-signed cert for the internal MCP TLS endpoint. It is read at
-# synth time by every cdk command and is git-ignored (never commit the private key),
-# so run this ONCE before any cdk command below.
 bash mcp-servers/tls/generate.sh
 ```
+> The final `generate.sh` step creates the self-signed cert for the internal MCP TLS endpoint.
+> Every `cdk` command reads it at synth time, and it is git-ignored (never commit the private
+> key), so run it once before any `cdk` command below.
 
 ### 2. Set account/Region + bootstrap
 ```bash
 export CDK_DEFAULT_ACCOUNT=<account-id>
 export CDK_DEFAULT_REGION=<region>
 export AWS_REGION=$CDK_DEFAULT_REGION AWS_DEFAULT_REGION=$CDK_DEFAULT_REGION
-# export AWS_PROFILE=<profile>   # if you use one
-aws sts get-caller-identity          # must show YOUR account
+aws sts get-caller-identity
 cdk bootstrap aws://$CDK_DEFAULT_ACCOUNT/$CDK_DEFAULT_REGION
 ```
+> `aws sts get-caller-identity` must show YOUR account before you continue. If you sign in with a
+> named profile, run `export AWS_PROFILE=<profile>` before these commands.
 
 ### 3. Deploy the platform (Part 1) and capture its coordinates
 Deploy the upstream OpenSearch **observability-stack** fully, into a VPC (this creates the
-domain, **AMP workspace**, OSIS pipeline, and **OTel demo EC2 host**):
+domain, **AMP workspace**, OSIS pipeline, and **OTel demo EC2 host**) — guided deploy docs:
+https://observability.opensearch.org/docs/deploy/aws/
 ```bash
-npx @opensearch-project/observability-stack        # https://observability.opensearch.org/docs/deploy/aws/
+npx @opensearch-project/observability-stack
 ```
 > Supply-chain note: `npx` fetches the latest published `@opensearch-project/observability-stack`
 > at runtime. This upstream installer runs an **interactive guided deployment** where the
@@ -55,6 +59,7 @@ npx @opensearch-project/observability-stack        # https://observability.opens
 > the OpenSearch release is chosen (and thereby pinned) during that flow. To also pin the
 > installer package itself to a known-good release, append a version — `npx
 > @opensearch-project/observability-stack@<version>`.
+
 Then capture coordinates (you type only these two):
 ```bash
 export DOMAIN_NAME=<opensearch-domain-name>
@@ -70,23 +75,25 @@ export DEMO_INSTANCE_ID=$(aws ec2 describe-instances --region "$AWS_REGION" \
   --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=*bservability*,*otel*,*demo*" \
   --query 'Reservations[0].Instances[0].InstanceId' --output text)
 
-echo "$DOMAIN_HOST | amp=$AMP_WS_ID | demo=$DEMO_INSTANCE_ID"   # none may be empty/None
+echo "$DOMAIN_HOST | amp=$AMP_WS_ID | demo=$DEMO_INSTANCE_ID"
 ```
+> Any of those three values may print empty or `None` — that is expected if the matching
+> resource is not present.
 
 ### 4. Build the MCP image (CodeBuild)
 ```bash
 cdk deploy DevOpsAgent-Build --require-approval never
 aws codebuild start-build --project-name devops-agent-mcp-build --region "$AWS_REGION"
-# wait for SUCCEEDED:
 BID=$(aws codebuild list-builds-for-project --project-name devops-agent-mcp-build --region "$AWS_REGION" --query "ids[0]" --output text)
 aws codebuild batch-get-builds --ids "$BID" --region "$AWS_REGION" --query "builds[0].buildStatus" --output text
 ```
+> The last command prints the build status. Wait until it reports `SUCCEEDED` before continuing.
 
 ### 5. Create the webhook secret (placeholder for now)
 The Part 2 stack **imports** this secret by name; its real value is set in Step 7 (after the
 webhook exists). Create it now with a placeholder so the import resolves:
 ```bash
-export WEBHOOK_URL='https://placeholder.invalid/webhook'   
+export WEBHOOK_URL='https://placeholder.invalid/webhook'
 aws secretsmanager create-secret --name devops-agent/webhook-hmac \
   --region "$AWS_REGION" --secret-string placeholder 2>/dev/null \
   || echo "secret already exists — ok"
@@ -118,10 +125,13 @@ cdk deploy --all \
 ### 7. Create the webhook on the Agent Space, then wire it in
 In the **AWS DevOps Agent** console, open the Agent Space **`devops-agent-incident-response`**
 (created in Step 6) → add an **Agent Space Webhook** with **HMAC** auth. Copy its two values,
-store the secret, and redeploy the Signal Bridge with the real URL:
+store the secret, and redeploy the Signal Bridge with the real URL.
+
+Set `WEBHOOK_URL` to the webhook URL on `devops-agent-incident-response`, and `HMAC_SECRET` to
+its HMAC signing key, then run:
 ```bash
-export WEBHOOK_URL='https://...'     # the webhook URL on devops-agent-incident-response
-export HMAC_SECRET='...'             # its HMAC signing key
+export WEBHOOK_URL='https://...'
+export HMAC_SECRET='...'
 aws secretsmanager put-secret-value --secret-id devops-agent/webhook-hmac \
   --region "$AWS_REGION" --secret-string "$HMAC_SECRET"
 
@@ -150,8 +160,9 @@ AMP_WORKSPACE_ID=$AMP_WS_ID FGAC_MASTER_ROLE_ARN=$FGAC_MASTER_ROLE_ARN \
 
 ### 9. Verify
 ```bash
-bash ./scenarios/verify.sh     # expect all [ PASS ]
+bash ./scenarios/verify.sh
 ```
+> Expect every check to report `[ PASS ]`.
 
 ### 10. Trigger an incident
 ```bash
@@ -167,5 +178,6 @@ FLAG=paymentFailure INSTANCE_ID=$DEMO_INSTANCE_ID bash ./scenarios/reset-flag.sh
 ```bash
 cdk destroy --all
 aws secretsmanager delete-secret --secret-id devops-agent/webhook-hmac --force-delete-without-recovery --region "$AWS_REGION"
-# also delete the Agent Space Webhook (Step 7) in the console, then tear down the Part 1 observability-stack.
 ```
+> Then delete the Agent Space Webhook (Step 7) in the console, and tear down the Part 1
+> observability-stack.
