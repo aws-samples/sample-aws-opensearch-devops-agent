@@ -220,25 +220,22 @@ aws secretsmanager delete-secret --secret-id devops-agent/webhook-hmac --force-d
 > DevOps Agent console still shows a leftover Agent Space or webhook afterward, remove it there.
 
 **Part 1 (the observability-stack) is NOT CloudFormation** — the upstream installer created it, so
-`cdk destroy` does not touch it. Preferred teardown is the installer's own destroy flow (see
-https://observability.opensearch.org/docs/deploy/aws/). To delete the main resources directly
-instead, make sure the Step 3 coordinates are still set in this terminal (re-run Step 3's capture
-block if this is a fresh shell), confirm they're non-empty, then delete:
-```bash
-echo "domain=$DOMAIN_NAME amp=$AMP_WS_ID demo=$DEMO_INSTANCE_ID"
-aws osis delete-pipeline --pipeline-name "$DOMAIN_NAME" --region "$AWS_REGION"
-aws opensearch delete-domain --domain-name "$DOMAIN_NAME" --region "$AWS_REGION"
-aws amp delete-workspace --workspace-id "$AMP_WS_ID" --region "$AWS_REGION"
-aws ec2 terminate-instances --instance-ids "$DEMO_INSTANCE_ID" --region "$AWS_REGION"
-APP_ID=$(aws opensearch list-applications --region "$AWS_REGION" --query "ApplicationSummaries[?name=='$DOMAIN_NAME'].id | [0]" --output text)
-[ -n "$APP_ID" ] && [ "$APP_ID" != "None" ] && aws opensearch delete-application --id "$APP_ID" --region "$AWS_REGION"
-```
-> The `echo` line must show real values before you run the deletes — an empty `$DOMAIN_NAME`
-> would make these error (harmless) or target nothing. The installer may also leave IAM roles
-> (`obs-stack-<id>-connected-data-source-prometheus-role`, `-ec2-demo-role`, `-osi-role`) and a
-> demo security group behind; delete those once the domain/pipeline/host are gone if you want the
-> account fully clean. Deploying the observability-stack more than once in the same VPC is what
-> causes those to pile up and share/strip security groups — keep it to one deployment per VPC.
+`cdk destroy` does not touch it and there is no teardown command here. **Delete its resources
+manually** (preferably via the installer's own teardown — see
+https://observability.opensearch.org/docs/deploy/aws/). The deployment is named `obs-stack-<id>`
+and spans these services — delete the domain/pipeline/host first, then the IAM roles and security
+group last, to avoid dependency errors:
+> - **Amazon OpenSearch Service** — the domain `obs-stack-<id>`, and its **OpenSearch UI application** (same name)
+> - **Amazon OpenSearch Ingestion (OSIS)** — the pipeline `obs-stack-<id>`
+> - **Amazon Managed Service for Prometheus (AMP)** — the workspace
+> - **Amazon EC2** — the OTel demo host instance `obs-stack-<id>-demo` (and its EBS volume)
+> - **Amazon EC2 (networking)** — the demo security group `obs-stack-<id>-demo-sg`
+> - **AWS IAM** — the roles `obs-stack-<id>-ec2-demo-role`, `obs-stack-<id>-osi-role`, `obs-stack-<id>-connected-data-source-prometheus-role` (and `obs-stack-directquery-role` if present)
+> - **AWS KMS** — the domain's encryption key, if a customer-managed key was created
+> - **Amazon CloudWatch** — any `obs-stack-<id>` log groups
+>
+> Deploy the observability-stack only **once per VPC** — repeated deployments pile up these
+> resources and share/strip security groups, which breaks ingestion and the MCP connectivity.
 
 ---
 
