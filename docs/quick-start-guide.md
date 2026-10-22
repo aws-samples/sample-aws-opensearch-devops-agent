@@ -55,7 +55,7 @@ cdk bootstrap aws://$CDK_DEFAULT_ACCOUNT/$CDK_DEFAULT_REGION
 > `export AWS_PAGER=""` stops the AWS CLI v2 from piping long output (like `start-build`) into a
 > pager (`less`), which otherwise looks like the terminal has hung until you press `q`.
 
-### 3. Deploy the platform (Part 1) and capture its coordinates
+### 3. Deploy the observability-stack platform and capture its coordinates
 **Estimated time: ~25–40 min.** The OpenSearch domain alone takes ~10–15 min to go active (the
 long pole); demo telemetry then takes a further ~10–15 min to start appearing in the indices.
 
@@ -112,14 +112,14 @@ aws codebuild batch-get-builds --ids "$BID" --region "$AWS_REGION" --query "buil
 > The last command prints the build status. Wait until it reports `SUCCEEDED` before continuing.
 
 ### 5. Create the webhook secret (placeholder for now)
-The Part 2 stack **imports** this secret by name; its real value is set in Step 7 (after the
+This repo's CDK stack (deployed in Step 6) **imports** this secret by name; its real value is set in Step 7 (after the
 webhook exists). Create it now with a placeholder so the import resolves:
 ```bash
 export WEBHOOK_URL='https://placeholder.invalid/webhook'
 aws secretsmanager create-secret --name devops-agent/webhook-hmac --region "$AWS_REGION" --secret-string placeholder 2>/dev/null || echo "secret already exists — ok"
 ```
 
-### 6. Deploy detection + agent (Part 2)
+### 6. Deploy detection + agent (this repo's CDK stacks)
 **Estimated time: ~20–30 min.** Breakdown: Shared ~1 min, SignalBridge ~2 min, FargateMcp
 ~10–15 min (NLB + ECS task reaching healthy — the long pole), Integration ~2–5 min (the
 `AWS::DevOpsAgent::Service` live handshake).
@@ -173,7 +173,7 @@ DEMO_INSTANCE_ID=$DEMO_INSTANCE_ID REGION=$AWS_REGION DOMAIN_HOST=$DOMAIN_HOST S
 > falls back to your *current* credentials (you'll see a `WARN: could not assume …` line — that's
 > fine **if** your caller is itself an FGAC master). Either way, that identity must be mapped to
 > OpenSearch's **`all_access`** role on the domain — normally the admin identity that deployed
-> Part 1.
+> the observability-stack (Step 3).
 >
 > If Step 8 fails with **403** / *"no permissions for [cluster:admin/...]"* on the security or
 > monitor calls, your principal isn't an FGAC master. Fix it one of two ways, then re-run Step 8:
@@ -208,7 +208,7 @@ FLAG=paymentFailure INSTANCE_ID=$DEMO_INSTANCE_ID bash ./scenarios/reset-flag.sh
 > Amazon Bedrock model-invocation cost (see [demo-scenarios.md](demo-scenarios.md)).
 
 ### 11. Clean up
-**Part 2 (this repo) is CloudFormation**, so `cdk destroy` removes it cleanly — including the
+**This repo's stacks (Steps 4–6) are CloudFormation**, so `cdk destroy` removes them cleanly — including the
 Agent Space, its `AWS::DevOpsAgent::Service`/PrivateConnection, and the webhook you added in
 Step 7 (the webhook is attached to the Agent Space and is deleted with it):
 ```bash
@@ -219,7 +219,7 @@ aws secretsmanager delete-secret --secret-id devops-agent/webhook-hmac --force-d
 > delete command — but `cdk destroy --all` deletes the Agent Space that owns the webhook. If the
 > DevOps Agent console still shows a leftover Agent Space or webhook afterward, remove it there.
 
-**Part 1 (the observability-stack) is NOT CloudFormation** — the upstream installer created it, so
+**The observability-stack (Step 3) is NOT CloudFormation** — the upstream installer created it, so
 `cdk destroy` does not touch it and there is no teardown command here. **Delete its resources
 manually** (preferably via the installer's own teardown — see
 https://observability.opensearch.org/docs/deploy/aws/). The deployment is named `obs-stack-<id>`
