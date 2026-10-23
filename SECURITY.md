@@ -31,24 +31,23 @@ This sample is built to be secure-by-default. Key controls:
 The quickstart deploys the upstream **OpenTelemetry Astronomy Shop** demo (plus a GenAI
 travel-planner and a fault-injection panel) as the fault-injectable workload. These are
 **third-party, demonstration-only** components — they are **not hardened by this project** and
-include software that carries its own vulnerabilities. For example, the demo's **PHP `quote`
-service** runs the PHP engine and is therefore subject to PHP-engine CVEs such as **PHP2Shell
-(CVE-2026-109618 / CVE-2026-109619, pre-auth RCE)**.
+run polyglot services whose runtimes carry their own vulnerabilities, independent of this
+sample's code.
 
 This project's **own** components — the detection monitors, Signal Bridge, MCP servers, and
-agent wiring — contain **no PHP** and are VPC-private by design. The demo is the only
-third-party runtime in the stack. Treat it accordingly:
+agent wiring — are VPC-private by design. The demo is the only third-party workload in the
+stack. Treat it accordingly:
 
 - **Keep it private.** Reach the demo UIs over AWS Systems Manager port-forwarding (as the docs
   describe), not a public endpoint. The upstream observability-stack installer may launch the
   demo EC2 host **with a public IP** — do not rely on the demo being private by default:
   restrict or remove that public IP and keep the host's security group closed to the internet.
-  PHP2Shell and similar flaws are only practically exploitable against an internet-reachable
-  PHP worker.
+  Those third-party runtimes are only practically exposed to remote exploits when they are
+  internet-reachable.
 - **Keep it ephemeral.** Tear the demo down when you are finished (it carries standing cost and
   attack surface). It is a demonstration workload, not production software.
-- **Patch via upstream.** The demo's component versions (including PHP) are set by the upstream
-  OpenTelemetry demo images, not this repo — pull current images if you keep the demo running.
+- **Patch via upstream.** The demo's component versions are set by the upstream OpenTelemetry
+  demo images, not this repo — pull current images if you keep the demo running.
 
 ## Before you deploy
 
