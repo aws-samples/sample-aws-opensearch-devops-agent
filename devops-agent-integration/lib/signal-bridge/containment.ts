@@ -4,7 +4,7 @@
  * Pure, AWS-free logic implementing the containment constraint from the design's
  * "Account and region containment" property (Property 10) and Requirements
  * R1.7, R6.7, and R6.8: the Signal_Bridge operates exclusively within account
- * `111122223333` and region `ap-southeast-2`, and any attempt to access a
+ * `111122223333` and region `us-east-1`, and any attempt to access a
  * resource outside that account or region is denied.
  *
  * These functions perform no I/O and make no AWS calls; they are intended to be
@@ -46,7 +46,7 @@ export function isTargetPermitted(target: Target): boolean {
  * parses the fixed ARN structure. Returns `null` when the input is not a
  * syntactically valid ARN (missing the `arn:` prefix or too few segments).
  *
- * @param arn an ARN string, e.g. `arn:aws:sns:ap-southeast-2:111122223333:devops-agent-alerts`
+ * @param arn an ARN string, e.g. `arn:aws:sns:us-east-1:111122223333:devops-agent-alerts`
  * @returns `{ account, region }` parsed from the ARN, or `null` when not a valid ARN
  */
 export function parseAccountRegionFromArn(

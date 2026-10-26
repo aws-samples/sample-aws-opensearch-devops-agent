@@ -16,7 +16,7 @@
 #
 # Overridable via environment variables (defaults target the deployed demo):
 #   INSTANCE_ID   EC2 instance running the OTel Demo (default i-0123456789abcdef0)
-#   REGION        AWS region                          (default ap-southeast-2)
+#   REGION        AWS region                          (default us-east-1)
 #   PROFILE       AWS CLI profile (optional; if set, passed as --profile)
 #   DEMO_DIR      OTel Demo checkout dir on the host  (default /opt/obs-stack/docker-compose/opentelemetry-demo)
 #   FLAG_FILE     flagd config file (relative to DEMO_DIR, default src/flagd/demo.flagd.json)
@@ -25,7 +25,7 @@
 set -euo pipefail
 
 INSTANCE_ID="${INSTANCE_ID:-i-0123456789abcdef0}"
-REGION="${REGION:-ap-southeast-2}"
+REGION="${REGION:-us-east-1}"
 PROFILE="${PROFILE:-}"
 DEMO_DIR="${DEMO_DIR:-/opt/obs-stack/docker-compose/opentelemetry-demo}"
 FLAG_FILE="${FLAG_FILE:-src/flagd/demo.flagd.json}"

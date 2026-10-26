@@ -46,7 +46,7 @@ RUN pip install --no-cache-dir "opensearch-mcp-server-py==${OPENSEARCH_MCP_VERSI
 # OPENSEARCH_URL is intentionally left unset here — it is injected at deploy time
 # (the VPC-private obs-stack domain HTTPS endpoint) so no environment-specific
 # value is baked into the image. It MUST be an https:// URL (SigV4 + TLS).
-ENV AWS_REGION=ap-southeast-2 \
+ENV AWS_REGION=us-east-1 \
     MCP_TRANSPORT=stream \
     MCP_HOST=0.0.0.0 \
     MCP_PORT=8000 \

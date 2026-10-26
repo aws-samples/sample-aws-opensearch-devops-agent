@@ -39,7 +39,7 @@
  * `aps:*RuleGroupsNamespace`/`*AlertManagerDefinition`/`Describe*` on the workspace,
  * `sns:CreateTopic/Subscribe/GetTopicAttributes` on the topic, region-conditioned VPC
  * ENI lifecycle, and log-stream writes — all pinned to `111122223333` /
- * `ap-southeast-2`. A caller may instead pass a pre-built `role`.
+ * `us-east-1`. A caller may instead pass a pre-built `role`.
  *
  * _Requirements: 2.5, 3.5_
  */
@@ -80,13 +80,13 @@ const OPENSEARCH_MONITOR_FILES = [
 export interface MonitorsDeploymentProps {
   /**
    * HTTPS endpoint of the VPC-private `obs-stack` OpenSearch domain, without a
-   * scheme, e.g. `vpc-obs-stack-....ap-southeast-2.es.amazonaws.com`.
+   * scheme, e.g. `vpc-obs-stack-....us-east-1.es.amazonaws.com`.
    */
   readonly domainEndpoint: string;
 
   /**
    * ARN of the OpenSearch domain, e.g.
-   * `arn:aws:es:ap-southeast-2:111122223333:domain/obs-stack`. Used to scope the
+   * `arn:aws:es:us-east-1:111122223333:domain/obs-stack`. Used to scope the
    * handler's `es:ESHttp*` grants.
    */
   readonly domainArn: string;
@@ -96,7 +96,7 @@ export interface MonitorsDeploymentProps {
 
   /**
    * AMP workspace ARN, e.g.
-   * `arn:aws:aps:ap-southeast-2:111122223333:workspace/ws-...`. Used to scope the
+   * `arn:aws:aps:us-east-1:111122223333:workspace/ws-...`. Used to scope the
    * handler's `aps:*` grants.
    */
   readonly ampWorkspaceArn: string;

@@ -1,0 +1,46 @@
+name: CI
+
+# Build, type-check, test, and synthesize on every push/PR to main.
+# Runs entirely offline — no AWS credentials required (the CDK app imports the
+# obs-stack VPC by attributes and uses placeholder account/region for synth).
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-synth:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: devops-agent-integration
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: devops-agent-integration/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Unit + property tests
+        run: npx jest --ci
+
+      - name: CDK synth (offline, placeholder context)
+        run: npx cdk synth --all
+        env:
+          CDK_DEFAULT_ACCOUNT: "111122223333"
+          CDK_DEFAULT_REGION: us-east-1

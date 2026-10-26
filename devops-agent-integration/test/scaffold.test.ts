@@ -10,7 +10,7 @@ import type { DevOpsAgentIncident } from "../lib/types";
 describe("scaffold", () => {
   it("pins the account and region constants", () => {
     expect(ACCOUNT).toBe("111122223333");
-    expect(REGION).toBe("ap-southeast-2");
+    expect(REGION).toBe("us-east-1");
   });
 
   it("shared incident type is usable", () => {

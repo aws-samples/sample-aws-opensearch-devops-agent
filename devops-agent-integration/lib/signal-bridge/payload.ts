@@ -9,7 +9,7 @@
  * - R1.6: each delivered alert carries the Alert_Monitor identifier, the triggering
  *   condition, the incident timestamp, and a reference to the applicable Runbook.
  * - R1.7 / R6.7: the payload's metadata pins the demo's account (111122223333) and
- *   region (ap-southeast-2).
+ *   region (us-east-1).
  */
 
 import {

@@ -82,7 +82,7 @@ export type MasterIdentity =
 export interface FgacRoleMappingProps {
   /**
    * HTTPS endpoint (or bare host) of the VPC-private `obs-stack` domain, e.g.
-   * `vpc-obs-stack-....ap-southeast-2.es.amazonaws.com`.
+   * `vpc-obs-stack-....us-east-1.es.amazonaws.com`.
    */
   readonly domainEndpoint: string;
 

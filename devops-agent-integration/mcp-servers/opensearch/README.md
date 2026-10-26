@@ -46,7 +46,7 @@ this. Host/port/transport can be overridden via the `MCP_HOST` / `MCP_PORT` /
 | Variable | Set where | Value / notes |
 |---|---|---|
 | `OPENSEARCH_URL` | **Injected at deploy time** (task 10.2) | HTTPS endpoint of the VPC-private `obs-stack` domain. Must be `https://…` so traffic is TLS + SigV4. Intentionally **not** baked into the image. |
-| `AWS_REGION` | Image default `ap-southeast-2` | Region used for SigV4 signing against the `es` service. |
+| `AWS_REGION` | Image default `us-east-1` | Region used for SigV4 signing against the `es` service. |
 | `OPENSEARCH_ENABLED_CATEGORIES` | Image default `observability` | Enables `PPLQueryTool` (the design's "PPLTool") in addition to the default core tools. |
 | `OPENSEARCH_SETTINGS_ALLOW_WRITE` | Image default `false` | Defense-in-depth: disables write ops at the tool layer (read-only is primarily enforced by IAM + FGAC — see below). |
 | `OPENSEARCH_SSL_VERIFY` | Image default `true` | Require TLS certificate verification for the domain connection. |
@@ -100,17 +100,17 @@ derived from your AWS CLI configuration and overridable via environment variable
 
 Prerequisites: Docker with `buildx`, AWS CLI v2, and configured AWS credentials.
 
-## Assumptions & TODOs (confirm before deploy)
+## Notes & assumptions
 
-- **TODO (deploy):** Provide the real `OPENSEARCH_URL` (VPC-private domain HTTPS
-  endpoint) as an environment variable on the AgentCore Runtime in task 10.2.
-- **Assumption:** The AgentCore MCP contract endpoint is `0.0.0.0:8000/mcp` and
-  the upstream streaming server serves MCP at `/mcp` + `/sse`. Verified against
-  current AWS AgentCore docs and the `opensearch-mcp-server-py` USER_GUIDE at
-  authoring time — re-confirm if the pinned version changes.
-- **Assumption:** Ambient-credential SigV4 (execution role) is selected simply by
-  setting `OPENSEARCH_URL` + `AWS_REGION` with no other auth method. If a future
-  package version changes auth precedence, set the appropriate IAM auth env vars
-  explicitly.
-- **Note:** `PPLTool` in the design corresponds to the upstream `PPLQueryTool`
-  (in the `observability` category), which is why that category is enabled.
+- `OPENSEARCH_URL` (the VPC-private domain HTTPS endpoint) is injected at deploy
+  time by the `DevOpsAgent-FargateMcp` stack as a container environment variable;
+  it is intentionally not baked into the image.
+- The MCP contract endpoint is `0.0.0.0:8000/mcp` and the upstream streaming server
+  serves MCP at `/mcp` + `/sse`. Verified against the `opensearch-mcp-server-py`
+  USER_GUIDE and confirmed end-to-end by a live deploy — re-check if the pinned
+  version changes.
+- Ambient-credential SigV4 (the ECS task role) is selected by setting
+  `OPENSEARCH_URL` + `AWS_REGION` with no other auth method. If a future package
+  version changes auth precedence, set the appropriate IAM auth env vars explicitly.
+- `PPLTool` in the design corresponds to the upstream `PPLQueryTool` (in the
+  `observability` category), which is why that category is enabled.

@@ -238,7 +238,7 @@ echo "   AMP rule group applied"
 AM_RENDERED="$(mktemp "${TMPDIR:-/tmp}/alertmanager.XXXXXX.yaml")"
 trap 'rm -f "$HS" "$PARAMS" "$AM_RENDERED"' EXIT
 sed -e "s#arn:aws:sns:[a-z0-9-]*:[0-9]*:devops-agent-alerts#${SNS_TOPIC_ARN}#g" \
-    -e "s#region: ap-southeast-2#region: ${REGION}#g" \
+    -e "s#region: us-east-1#region: ${REGION}#g" \
     "$MON_DIR/amp/alertmanager.yaml" > "$AM_RENDERED"
 
 aws amp create-alert-manager-definition "${PA[@]+"${PA[@]}"}" --region "$REGION" \

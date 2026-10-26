@@ -17,7 +17,7 @@
 #   FLAG        flagd flag name to set          (default paymentFailure)
 #   VARIANT     variant to set it to            (default 100%)
 #   INSTANCE_ID EC2 running the OTel Demo        (default i-0123456789abcdef0)
-#   REGION      AWS region                       (default ap-southeast-2)
+#   REGION      AWS region                       (default us-east-1)
 #   PROFILE     AWS CLI profile (optional)
 #   DEMO_DIR    OTel Demo dir on the host        (default /opt/obs-stack/docker-compose/opentelemetry-demo)
 #   FLAG_FILE   flagd config (rel to DEMO_DIR)   (default src/flagd/demo.flagd.json)

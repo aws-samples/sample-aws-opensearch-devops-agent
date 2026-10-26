@@ -138,7 +138,7 @@ export interface FargateMcpStackProps extends cdk.StackProps {
 
   /**
    * HTTPS endpoint of the VPC-private `obs-stack` OpenSearch domain (with scheme),
-   * e.g. `https://vpc-obs-stack-....ap-southeast-2.es.amazonaws.com`. Passed to the
+   * e.g. `https://vpc-obs-stack-....us-east-1.es.amazonaws.com`. Passed to the
    * OpenSearch MCP container as `OPENSEARCH_URL`.
    */
   readonly opensearchEndpoint: string;

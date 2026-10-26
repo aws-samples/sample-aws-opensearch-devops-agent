@@ -164,17 +164,18 @@ const AGENTCORE_SIGV4_SERVICE = "bedrock-agentcore";
 const MCP_SIGV4_SERVICE_TYPE = "mcpserversigv4";
 
 /**
- * Best-effort default for the AgentCore Runtime MCP invoke endpoint when a real
- * endpoint is not supplied via props.
+ * Fallback for the legacy AgentCore-Runtime MCP invoke endpoint, used only if that
+ * hosting path is selected and no explicit endpoint is supplied.
  *
- * TODO(confirm): AgentCore Runtime MCP invoke URL format. The fully-qualified
- * shape is believed to be
- * `https://bedrock-agentcore.${REGION}.amazonaws.com/runtimes/<url-encoded-runtimeArn>/invocations`,
- * but the runtime ARN is only known post-deploy (it is a CFN token), so we fall
- * back to the regional host root here and expect the real endpoint to be threaded
- * in via `openSearchMcpEndpoint`. This is a placeholder that must be confirmed/
- * overridden before deploy — it does NOT block synth. (Legacy AgentCore path only;
- * the default hosting is ECS Fargate reached via a PrivateConnection.)
+ * NOTE: the default deployment does NOT use this. The quickstart hosts the MCP
+ * server on ECS Fargate and the agent reaches it over an
+ * `AWS::DevOpsAgent::PrivateConnection` at `openSearchPrivateEndpoint`
+ * (`mcp.internal:8443/mcp`) — the verified, end-to-end path. The AgentCore-Runtime
+ * invoke URL
+ * (`https://bedrock-agentcore.${REGION}.amazonaws.com/runtimes/<url-encoded-runtimeArn>/invocations`)
+ * applies only to the legacy path, its runtime ARN is a post-deploy CFN token, and
+ * that path is not exercised by this sample; supply `openSearchMcpEndpoint`
+ * explicitly if you use it. This default does not block synth.
  */
 const DEFAULT_MCP_ENDPOINT = `https://${AGENTCORE_SIGV4_SERVICE}.${REGION}.amazonaws.com/`;
 
@@ -189,11 +190,12 @@ const DEFAULT_MCP_ENDPOINT = `https://${AGENTCORE_SIGV4_SERVICE}.${REGION}.amazo
  * configured out-of-band (see the file header). The MCP server is reached via an
  * `AWS::DevOpsAgent::PrivateConnection` into the obs-stack VPC.
  *
- * TODO(confirm at deploy): the `AWS::DevOpsAgent::*` property casing was verified
- * via `describe-type`, but (a) the `McpRoleArn` semantics — i.e. that the runtime
- * EXECUTION role is the correct role for the agent to SigV4-sign MCP invokes with
- * — and (b) the `Endpoint` URL format still need confirmation against a live
- * deploy.
+ * The `AWS::DevOpsAgent::*` property casing and the private `Endpoint`
+ * (`mcp.internal:8443/mcp`) are verified against a live deploy: the AgentSpace,
+ * Service, and PrivateConnection create successfully and the agent reaches the MCP
+ * server at that endpoint. `McpRoleArn` is optional — when omitted (the default
+ * here) DevOps Agent resolves credentials automatically; set it only to pin a
+ * dedicated DevOps-Agent-assumable invoke role.
  */
 export interface DevOpsAgentConfigProps {
   /**
@@ -217,8 +219,9 @@ export interface DevOpsAgentConfigProps {
 
   /**
    * Optional OpenSearch MCP runtime invoke endpoint (https). Defaults to
-   * {@link DEFAULT_MCP_ENDPOINT} — see the TODO on that constant; the real URL is
-   * only known post-deploy.
+   * {@link DEFAULT_MCP_ENDPOINT} (legacy AgentCore-Runtime path only — see the note
+   * there). The default deployment reaches the MCP server via the private endpoint
+   * instead, so this is normally left unset.
    */
   readonly openSearchMcpEndpoint?: string;
 
@@ -252,9 +255,9 @@ export interface DevOpsAgentConfigProps {
 
   /**
    * Whether to create the runbook `AWS::DevOpsAgent::Asset`. Defaults to `true`.
-   * Temporarily set `false` to deploy the core agent wiring (AgentSpace + Services
-   * + Associations) first while the Asset's exact schema is being confirmed, so a
-   * bad Asset request does not roll back the whole stack.
+   * Set `false` to deploy the core agent wiring (AgentSpace + Services +
+   * Associations) without the Asset — an escape hatch for iterating on the Asset
+   * on its own so an Asset error cannot roll back the whole stack.
    */
   readonly createRunbookAsset?: boolean;
 

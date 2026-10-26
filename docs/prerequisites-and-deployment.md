@@ -8,7 +8,7 @@ platform) is a prerequisite — see [`../observability-stack/README.md`](../obse
 - An AWS account and a Region where **AWS DevOps Agent** is available, plus: Amazon
   OpenSearch Service, Amazon OpenSearch Ingestion, Amazon Managed Service for
   Prometheus, Amazon ECS Fargate, AWS Lambda, Amazon SNS, and AWS Secrets Manager.
-  Developed and tested in `ap-southeast-2`.
+  Developed and tested in `us-east-1`.
 - **AWS DevOps Agent enabled**, with a **generic webhook** integration created in the
   DevOps Agent console. Copy the **webhook URL** and the **HMAC signing secret** it
   issues — you supply both below. (This is a manual, one-time console step; nothing in

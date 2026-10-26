@@ -16,7 +16,7 @@ PERCENTAGE variants (`100%`, `90%`, `75%`, `50%`, `25%`, `10%`, `off`) — NOT t
 `>=17`. The demo dir on the host is `/opt/obs-stack/docker-compose/opentelemetry-demo`;
 flagd is restarted with `docker restart flagd`.
 
-**Fixed context:** account `111122223333`, region `ap-southeast-2`, OTel Demo host
+**Fixed context:** account `111122223333`, region `us-east-1`, OTel Demo host
 `i-0123456789abcdef0`, primary monitor `M-logs-error-rate`
 (runbook reference `runbook://M-logs-error-rate`), OpenSearch logs index
 `logs-otel-v1-000001` (time field `time`).
@@ -30,7 +30,7 @@ payment-failure WARN log volume rises in the OpenSearch_App.
 
 **Concrete checks:**
 - Run `./induce.sh`; the SSM `send-command` returns a `CommandId`, and
-  `aws ssm get-command-invocation --region ap-southeast-2 --command-id <CommandId> --instance-id i-0123456789abcdef0`
+  `aws ssm get-command-invocation --region us-east-1 --command-id <CommandId> --instance-id i-0123456789abcdef0`
   reports `Status=Success`.
 - On the host, `src/flagd/demo.flagd.json` shows the `paymentFailure` flag with
   `"defaultVariant": "100%"` and the `flagd` container has been restarted.

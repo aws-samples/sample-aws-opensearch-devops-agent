@@ -22,9 +22,9 @@ alertmanager_config: |
   receivers:
     - name: devops-agent-sns
       sns_configs:
-        - topic_arn: arn:aws:sns:ap-southeast-2:111122223333:devops-agent-alerts
+        - topic_arn: arn:aws:sns:us-east-1:111122223333:devops-agent-alerts
           sigv4:
-            region: ap-southeast-2
+            region: us-east-1
           subject: 'DevOpsAgent metric alert {{ .CommonLabels.monitorId }} [{{ .Status }}]'
           message: |
             {"status":"{{ .Status }}","alerts":[{{ range $i, $a := .Alerts }}{{ if $i }},{{ end }}{"status":"{{ $a.Status }}","labels":{"monitorId":"{{ $a.Labels.monitorId }}","severity":"{{ $a.Labels.severity }}","alertname":"{{ $a.Labels.alertname }}"},"annotations":{"triggeringCondition":"{{ $a.Annotations.triggeringCondition }}","runbookRef":"{{ $a.Annotations.runbookRef }}"},"startsAt":"{{ $a.StartsAt }}"}{{ end }}]}

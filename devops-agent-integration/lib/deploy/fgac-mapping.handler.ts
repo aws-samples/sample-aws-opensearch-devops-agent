@@ -315,7 +315,7 @@ export function resolveConfig(props: Record<string, unknown>): FgacConfig {
     optionalString(props, "FgacRoleName") ?? "devops_agent_mcp_readonly";
   const indexPatterns = parsePatterns(props["IndexPatterns"]);
   const region =
-    optionalString(props, "Region") ?? process.env["AWS_REGION"] ?? "ap-southeast-2";
+    optionalString(props, "Region") ?? process.env["AWS_REGION"] ?? "us-east-1";
   const masterRoleArn =
     optionalString(props, "MasterRoleArn") ?? emptyToUndefined(process.env["MASTER_ROLE_ARN"]);
 

@@ -1,5 +1,7 @@
 # Autonomous Monitoring using Amazon OpenSearch Service and AWS DevOps Agent
 
+[![CI](https://github.com/aws-samples/sample-aws-opensearch-devops-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/aws-samples/sample-aws-opensearch-devops-agent/actions/workflows/ci.yml)
+
 An end-to-end sample that turns an Amazon OpenSearch Service observability stack into an **autonomous incident-response loop**: telemetry is detected by OpenSearch and Amazon Managed Service for Prometheus (AMP) alerting, incidents are pushed to **AWS DevOps Agent** through a secure webhook bridge, and the agent gathers deep evidence on demand from purpose-built **MCP (Model Context Protocol) servers** to perform root-cause analysis and recommend remediation.
 
 > This repository is sample code intended for demonstration and learning. It is **not** production-ready as-is — review the [Security](#security) and [Cost](#cost-assessment) sections before deploying into any account.
@@ -160,7 +162,7 @@ autonomous-monitoring-opensearch-devops-agent/
 
 ## Prerequisites
 
-- An AWS account with access to Amazon OpenSearch Service, Amazon OpenSearch Ingestion, Amazon Managed Service for Prometheus, Amazon ECS Fargate, AWS Lambda, Amazon SNS, and **AWS DevOps Agent** in your target Region (this sample was developed in `ap-southeast-2`).
+- An AWS account with access to Amazon OpenSearch Service, Amazon OpenSearch Ingestion, Amazon Managed Service for Prometheus, Amazon ECS Fargate, AWS Lambda, Amazon SNS, and **AWS DevOps Agent** in your target Region (for example, `us-east-1`).
 - **AWS DevOps Agent** enabled in the account, with a **generic webhook** integration created (you will receive a webhook URL and an HMAC signing secret to configure — see [deployment docs](docs/prerequisites-and-deployment.md)).
 - Node.js 18+ and the AWS CDK v2 CLI (`npm install -g aws-cdk`).
 - A container build capability for the MCP server images (Docker, or an EC2/CodeBuild builder — the images are `arm64`).

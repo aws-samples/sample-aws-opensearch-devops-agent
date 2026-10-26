@@ -13,7 +13,7 @@
 //
 // Resolved from the environment so no code edit is needed to target your account:
 //   ACCOUNT  <- CDK_DEFAULT_ACCOUNT | CDK_ACCOUNT   (falls back to the docs example)
-//   REGION   <- CDK_DEFAULT_REGION  | AWS_REGION    (falls back to ap-southeast-2)
+//   REGION   <- CDK_DEFAULT_REGION  | AWS_REGION    (falls back to us-east-1)
 // Set these in your shell before `cdk synth`/`cdk deploy`, e.g.:
 //   export CDK_DEFAULT_ACCOUNT=<your-account-id>
 //   export CDK_DEFAULT_REGION=<your-region>
@@ -24,7 +24,7 @@ export const ACCOUNT: string =
 
 /** The only AWS region this demo is permitted to operate within. */
 export const REGION: string =
-  process.env.CDK_DEFAULT_REGION ?? process.env.AWS_REGION ?? "ap-southeast-2";
+  process.env.CDK_DEFAULT_REGION ?? process.env.AWS_REGION ?? "us-east-1";
 
 export type Account = string;
 export type Region = string;

@@ -50,7 +50,7 @@ export interface IamPolicyDocument {
  *      `GetQueueAttributes`, `SendMessage`) on the `devops-agent-alerts-dlq` queue.
  *   3. VPC ENI lifecycle (`ec2:CreateNetworkInterface`,
  *      `DescribeNetworkInterfaces`, `DeleteNetworkInterface`), region-conditioned
- *      to `ap-southeast-2` via `aws:RequestedRegion`.
+ *      to `us-east-1` via `aws:RequestedRegion`.
  *   4. Log-stream writes (`logs:CreateLogStream`, `logs:PutLogEvents`) on the
  *      Lambda's own log group.
  *

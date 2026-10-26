@@ -3,7 +3,7 @@
  * CDK app entry point for the DevOps Agent Integration demo (task 11.4).
  *
  * Wires the whole autonomous incident-response topology together in dependency
- * order, pinned to the demo account/region `111122223333` / `ap-southeast-2`
+ * order, pinned to the demo account/region `111122223333` / `us-east-1`
  * (R1.7, R6.7). The build follows the design's "High-Level Topology":
  *
  *   Shared refs ──► Signal_Bridge stack ─┐
@@ -141,7 +141,7 @@ const obsSecurityGroupId = cfg("obsSecurityGroupId", "sg-0123456789abcdef0");
 // OpenSearch domain coordinates.
 const opensearchEndpoint = cfg(
   "opensearchEndpoint",
-  "vpc-obs-stack-xxxxxxxxxxxxxxxxxxxxxxxxxx.ap-southeast-2.es.amazonaws.com",
+  "vpc-obs-stack-xxxxxxxxxxxxxxxxxxxxxxxxxx.us-east-1.es.amazonaws.com",
 );
 const domainArn = cfg(
   "domainArn",
