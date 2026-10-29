@@ -39,6 +39,9 @@ jobs:
       - name: Unit + property tests
         run: npx jest --ci
 
+      - name: Generate internal TLS cert (git-ignored; read at synth)
+        run: bash mcp-servers/tls/generate.sh
+
       - name: CDK synth (offline, placeholder context)
         run: npx cdk synth --all
         env:

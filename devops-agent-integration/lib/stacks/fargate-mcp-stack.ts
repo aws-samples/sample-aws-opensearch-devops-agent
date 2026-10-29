@@ -41,8 +41,9 @@
  * ----------------------------------------------------
  * The NLB TLS listener presents a self-signed cert whose CN/SAN equals the private
  * DNS name it fronts (`opensearch-mcp.mcp.internal`, ~10-year validity). The cert+key PEMs are generated OUT OF BAND (deterministically,
- * once) by `mcp-servers/tls/generate.sh` and committed under `mcp-servers/tls/`. They
- * are read at `cdk synth` time and imported into ACM via an `AwsCustomResource` calling
+ * once) by `mcp-servers/tls/generate.sh`. They are git-ignored (a private key must
+ * not be committed), so `generate.sh` MUST be run before the first `cdk synth` (CI
+ * does this as a step). They are read at `cdk synth` time and imported into ACM via an `AwsCustomResource` calling
  * `acm:ImportCertificate`. File-based (rather than generating a fresh cert inside
  * synth) keeps synth deterministic — no per-synth cert churn / re-import on every
  * deploy. See `mcp-servers/tls/README.md`.
