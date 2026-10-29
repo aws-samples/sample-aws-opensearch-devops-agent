@@ -2,7 +2,7 @@
 %% Render to PNG:  mmdc -i architecture.mmd -o architecture.png -b transparent
 %% (mmdc = @mermaid-js/mermaid-cli).  GitHub also renders this inline in Markdown.
 graph TD
-    subgraph EC2["OTel Demo Host (SSM-managed)"]
+    subgraph EC2["Amazon EC2 (SSM-managed)"]
         DEMO["OpenTelemetry demo workloads<br/>Astronomy Shop + GenAI travel planner"]
         FLAGS["Fault injection<br/>flagd + fault-panel"]
         OTEL["OpenTelemetry Collector<br/>SigV4 exporters"]
@@ -13,7 +13,7 @@ graph TD
     subgraph PLATFORM["Observability platform (Part 1)"]
         OSIS["Amazon OpenSearch Ingestion<br/>Data Prepper"]
         OS[("Amazon OpenSearch Service<br/>logs / traces / service map")]
-        AMP[("Amazon Managed Prometheus<br/>metrics")]
+        AMP[("Amazon Managed Service for Prometheus<br/>metrics")]
     end
 
     subgraph DETECT["Detection + signal bridge (Part 2)"]

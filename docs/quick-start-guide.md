@@ -65,6 +65,12 @@ https://observability.opensearch.org/docs/deploy/aws/
 ```bash
 npx @opensearch-project/observability-stack
 ```
+> **Choose "Standard create" (advanced), NOT "Easy create", for the OpenSearch domain.** When
+> the guided installer reaches the domain-creation step, Easy create provisions a **public**
+> domain— but Part 2 and this whole stack assumes a
+> **VPC-private** domain for security. Use Standard create so you can enable **VPC access** and place the
+> domain in your VPC subnets + security group. 
+
 > Supply-chain note: `npx` fetches the latest published `@opensearch-project/observability-stack`
 > at runtime. This upstream installer runs an **interactive guided deployment** where the
 > OpenSearch version and components are selected in the steps *after* the `npx` invocation, so

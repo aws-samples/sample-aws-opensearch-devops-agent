@@ -2,291 +2,149 @@
 
 [![CI](https://github.com/aws-samples/sample-aws-opensearch-devops-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/aws-samples/sample-aws-opensearch-devops-agent/actions/workflows/ci.yml)
 
-An end-to-end sample that turns an Amazon OpenSearch Service observability stack into an **autonomous incident-response loop**: telemetry is detected by OpenSearch and Amazon Managed Service for Prometheus (AMP) alerting, incidents are pushed to **AWS DevOps Agent** through a secure webhook bridge, and the agent gathers deep evidence on demand from purpose-built **MCP (Model Context Protocol) servers** to perform root-cause analysis and recommend remediation.
+Turn an Amazon OpenSearch Service observability stack into a self-driving incident-response loop. Amazon OpenSearch Service and Amazon Managed Service for Prometheus detect the incident, a secure webhook bridge hands it to **AWS DevOps Agent**, and the agent pulls evidence on demand from an OpenSearch MCP (Model Context Protocol) server to perform root-cause analysis and recommend remediation — with no human opening a dashboard.
 
-> This repository is sample code intended for demonstration and learning. It is **not** production-ready as-is — review the [Security](#security) and [Cost](#cost-assessment) sections before deploying into any account.
+> Sample code for demonstration and learning. Review the [Security](#security) and [Cost](#cost) sections before deploying into any account.
 
-## 🚀 Start here
+## Start here
 
-**New here? Follow the [Quick Start Guide](docs/quick-start-guide.md)** — a linear, copy-paste checklist that takes you from clone to a working autonomous investigation (~60–90 min). Everything below is reference detail.
-
-## Table of Contents
-- [Introduction](#introduction)
-- [Key Features](#key-features)
-- [Architecture](#architecture)
-- [How It Works](#how-it-works)
-- [Repository Structure](#repository-structure)
-- [Prerequisites](#prerequisites)
-- [Deployment](#deployment)
-- [Running the Demo](#running-the-demo)
-- [Detection Monitors](#detection-monitors)
-- [Cost Assessment](#cost-assessment)
-- [Cleanup](#cleanup)
-- [Security](#security)
-- [Contributing](#contributing)
-- [License](#license)
-
-## Introduction
-
-Modern observability stacks are excellent at *storing* logs, traces, and metrics — but a human still has to notice an alert, pull the relevant evidence from several tools, correlate it, and decide what to do. This sample closes that loop.
-
-It deploys a complete AWS-managed observability platform (OpenTelemetry → Amazon OpenSearch Ingestion → Amazon OpenSearch Service + Amazon Managed Service for Prometheus) and connects it to **AWS DevOps Agent**, so that when telemetry crosses a threshold, an investigation is triggered automatically. The agent then queries the same telemetry back through MCP servers to explain *why* the incident happened and *what* to do about it — without a human opening a single dashboard.
-
-A bundled OpenTelemetry demo application (the [OpenTelemetry Astronomy Shop](https://github.com/open-telemetry/opentelemetry-demo) plus a multi-agent GenAI "travel planner") provides realistic, fault-injectable workloads so you can reproduce incidents on demand.
-
-## Key Features
-
-- **Autonomous detection → investigation loop** — OpenSearch Alerting and AMP alerting rules detect incidents and trigger AWS DevOps Agent investigations with no human in the path.
-- **Secure webhook signal bridge** — Alerts converge on Amazon SNS and are translated by a Lambda that HMAC-SHA256-signs each payload before POSTing to the DevOps Agent generic webhook (replay-protected, no inbound path into the VPC).
-- **On-demand evidence via MCP** — The AWS/OpenSearch-maintained `opensearch-mcp-server-py` MCP server (logs, traces, service-map, PPL) lets the agent pull rich, correlated evidence during an investigation. Metrics from Amazon Managed Prometheus feed the detection/alerting path.
-- **VPC-private by design** — The OpenSearch MCP server runs on Amazon ECS Fargate behind an internal TLS Network Load Balancer and is reached through `AWS::DevOpsAgent::PrivateConnection`; the OpenSearch domain and AMP workspace are never exposed publicly.
-- **Realistic, fault-injectable workloads** — Toggle faults in the OpenTelemetry demo (via `flagd`) and the GenAI travel-planner (via a fault-injection panel) to reproduce incidents deterministically.
-- **Six curated detection monitors** — Log error-rate, trace-latency SLO, service-map anomaly, AMP PromQL, and two GenAI-agent monitors, each grounded in real telemetry thresholds.
-- **Infrastructure as code** — Everything is AWS CDK (TypeScript), split into composable stacks, with property-based tests (`fast-check`).
+Follow the **[Quick Start Guide](docs/quick-start-guide.md)** — a copy-paste checklist from clone to a working autonomous investigation (~60–90 min).
 
 ## Architecture
 
-```mermaid
-graph TD
-    subgraph EC2["OTel Demo Host (SSM-managed)"]
-        DEMO["OpenTelemetry demo workloads<br/>Astronomy Shop + GenAI travel planner"]
-        FLAGS["Fault injection<br/>flagd + fault-panel"]
-        OTEL["OpenTelemetry Collector<br/>SigV4 exporters"]
-        FLAGS --> DEMO
-        DEMO -->|OTLP localhost| OTEL
-    end
+![Architecture: Amazon EC2 telemetry flows through Amazon OpenSearch Ingestion into Amazon OpenSearch Service and Amazon Managed Service for Prometheus; detections fan into Amazon SNS and an AWS Lambda signal bridge that calls AWS DevOps Agent, which queries an OpenSearch MCP server on Amazon ECS on AWS Fargate](docs/images/architecture.svg)
 
-    subgraph PLATFORM["Observability platform (Part 1)"]
-        OSIS["Amazon OpenSearch Ingestion<br/>Data Prepper"]
-        OS[("Amazon OpenSearch Service<br/>logs / traces / service map")]
-        AMP[("Amazon Managed Prometheus<br/>metrics")]
-    end
+1. **Amazon EC2** runs the OpenTelemetry demo workloads and a local **OpenTelemetry Collector**.
+2. The Collector exports logs and traces (SigV4) to **Amazon OpenSearch Ingestion** and metrics to **Amazon Managed Service for Prometheus**.
+3. Amazon OpenSearch Ingestion (Data Prepper) writes logs, traces, and a service map into **Amazon OpenSearch Service**.
+4. **Amazon OpenSearch Service** alerting monitors and **Amazon Managed Service for Prometheus** rules evaluate the telemetry and, on breach, publish to **Amazon SNS**.
+5. An **AWS Lambda** signal bridge translates the message into the DevOps Agent incident schema, signs it with HMAC-SHA256, and POSTs it to the **AWS DevOps Agent** webhook.
+6. **AWS DevOps Agent** investigates, calling the OpenSearch MCP server on **Amazon ECS on AWS Fargate** over an `AWS::DevOpsAgent::PrivateConnection` to gather logs, traces, service map, and PPL evidence, then returns RCA and remediation guidance.
 
-    subgraph DETECT["Detection + signal bridge (Part 2)"]
-        MON["OpenSearch Alerting monitors"]
-        RULE["AMP alerting rules"]
-        SNS["Amazon SNS"]
-        LAMBDA["Signal Bridge Lambda<br/>HMAC-SHA256 sign"]
-    end
+Source for the diagram: [`docs/images/architecture.svg`](docs/images/architecture.svg) (regenerate with `python3 docs/images/gen-architecture.py`) and the Mermaid version at [`docs/images/architecture.mmd`](docs/images/architecture.mmd). Full component detail, data model, and decision records are in [docs/architecture.md](docs/architecture.md).
 
-    DOA["AWS DevOps Agent<br/>Investigation + RCA"]
+## Key features
 
-    subgraph MCP["MCP evidence server — ECS Fargate (VPC-private, TLS)"]
-        MCPOS["OpenSearch MCP"]
-    end
-
-    OTEL -->|OTLP + SigV4| OSIS
-    OTEL -->|remote_write SigV4| AMP
-    OSIS --> OS
-    OS --> MON
-    AMP --> RULE
-    MON -->|breach| SNS
-    RULE -->|breach| SNS
-    SNS --> LAMBDA
-    LAMBDA -->|HMAC webhook POST| DOA
-    DOA -->|PrivateConnection| MCPOS
-    MCPOS -->|IAM/SigV4| OS
-```
-
-> The diagram above renders inline on GitHub. A standalone source is at
-> [`docs/images/architecture.mmd`](docs/images/architecture.mmd); export a PNG with
-> `mmdc -i docs/images/architecture.mmd -o docs/images/architecture.png`.
-
-At a high level:
-
-1. The **OpenTelemetry demo workload** on an SSM-managed EC2 host emits OTLP telemetry to a local **OpenTelemetry Collector**.
-2. The Collector exports logs and traces (SigV4) to an **Amazon OpenSearch Ingestion (OSIS)** pipeline and metrics to **Amazon Managed Service for Prometheus (AMP)**.
-3. OSIS (Data Prepper) transforms and writes logs, traces, and a service map into **Amazon OpenSearch Service**.
-4. **OpenSearch Alerting** monitors and **AMP alerting rules** evaluate the telemetry and, on breach, publish to an **Amazon SNS** topic.
-5. A **Signal Bridge Lambda** translates the SNS message into the DevOps Agent incident schema, HMAC-signs it, and POSTs it to the **AWS DevOps Agent** webhook.
-6. During its investigation, the agent calls the **OpenSearch MCP server** over a private connection to gather evidence (logs, traces, service map, PPL), then produces RCA and remediation guidance following a lightweight **runbook**. (Metrics in AMP drive detection; the agent corroborates metric alerts from OpenSearch logs and spans.)
-
-See [docs/architecture.md](docs/architecture.md) for the full component diagram, data model, and decision records.
-
-## How It Works
-
-```
- flagd / fault-panel        OTel Collector          OSIS (Data Prepper)        Amazon OpenSearch Service
-  (inject a fault)  ──▶  (SigV4 OTLP export)  ──▶  (transform + route)  ──▶  (logs / traces / service map)
-                                    │                                                     │
-                                    └──────────────▶ Amazon Managed Prometheus (metrics)  │
-                                                                                          ▼
-                                                                          OpenSearch Alerting monitors
-                                                                          + AMP alerting rules
-                                                                                          │  (breach)
-                                                                                          ▼
-                        AWS DevOps Agent   ◀── HMAC webhook ── Signal Bridge Lambda ◀── Amazon SNS
-                                │
-                                └──▶ OpenSearch MCP server  (logs / traces / service-map / PPL)   ── ECS Fargate (private TLS)
-```
-
-## Repository Structure
-
-```
-autonomous-monitoring-opensearch-devops-agent/
-├── README.md                     # this file
-├── CHANGELOG.md
-├── CONTRIBUTING.md
-├── CODE_OF_CONDUCT.md
-├── SECURITY.md
-├── LICENSE                       # MIT-0
-├── NOTICE
-├── THIRD-PARTY-LICENSES.txt
-├── threat-modeling/              # lightweight threat model
-├── docs/                         # deep-dive documentation
-│   ├── quick-start-guide.md      # ← linear, follow-along deployment checklist
-│   ├── architecture.md
-│   ├── prerequisites-and-deployment.md
-│   ├── demo-scenarios.md
-│   ├── security-hardening.md
-│   └── images/
-├── observability-stack/          # Part 1: the AWS-managed observability platform (CDK)
-│   ├── bin/ lib/ custom-resources/
-│   └── ...
-└── devops-agent-integration/     # Part 2: detection + autonomous agent (CDK)
-    ├── bin/app.ts                # stack composition + feature flags
-    ├── lib/
-    │   ├── stacks/               # Shared, FargateMcp, SignalBridge, Integration
-    │   ├── agent/                # DevOps Agent Service / Association / PrivateConnection / Asset
-    │   ├── detection/            # monitor + AMP rule provisioning
-    │   ├── signal-bridge/        # SNS → HMAC webhook Lambda
-    │   ├── runbook/              # runbook asset packaging
-    │   └── iam/                  # least-privilege roles
-    ├── agent-config/agent.ts     # DevOps Agent configuration
-    ├── mcp-servers/              # opensearch/ + tls/ (image built in-account via CodeBuild)
-    ├── monitors/                 # OpenSearch Alerting monitors + amp/ rules
-    ├── runbooks/                 # agent-runbook.md (INCIDENT_RCA guidance)
-    ├── scenarios/                # induce/reset-flag.sh, register-from-host.sh, verify.sh
-    └── test/                     # unit + property-based tests
-```
+- **Closed detection → investigation loop.** Amazon OpenSearch Service alerting and Amazon Managed Service for Prometheus rules trigger AWS DevOps Agent with no human in the path.
+- **Secure signal bridge.** Alerts converge on Amazon SNS; an AWS Lambda HMAC-SHA256-signs each payload (replay-protected) before POSTing to the DevOps Agent webhook — no inbound path into the VPC.
+- **On-demand evidence via MCP.** The OpenSearch MCP server (`opensearch-mcp-server-py`) lets the agent pull correlated logs, traces, service map, and PPL during an investigation.
+- **VPC-private by design.** The MCP server runs on Amazon ECS on AWS Fargate behind an internal TLS Network Load Balancer, reached via `AWS::DevOpsAgent::PrivateConnection`. The Amazon OpenSearch Service domain and Amazon Managed Service for Prometheus workspace are never exposed publicly.
+- **Fault-injectable workloads.** Toggle faults in the [OpenTelemetry Astronomy Shop](https://github.com/open-telemetry/opentelemetry-demo) (via `flagd`) and a GenAI travel-planner (via a fault panel) to reproduce incidents deterministically.
+- **Infrastructure as code.** AWS CDK (TypeScript), composable stacks, property-based tests (`fast-check`).
 
 ## Prerequisites
 
-- An AWS account with access to Amazon OpenSearch Service, Amazon OpenSearch Ingestion, Amazon Managed Service for Prometheus, Amazon ECS Fargate, AWS Lambda, Amazon SNS, and **AWS DevOps Agent** in your target Region (for example, `us-east-1`).
-- **AWS DevOps Agent** enabled in the account, with a **generic webhook** integration created (you will receive a webhook URL and an HMAC signing secret to configure — see [deployment docs](docs/prerequisites-and-deployment.md)).
-- Node.js 18+ and the AWS CDK v2 CLI (`npm install -g aws-cdk`).
-- A container build capability for the MCP server images (Docker, or an EC2/CodeBuild builder — the images are `arm64`).
-- The AWS CLI configured with credentials for the target account (`aws configure` or a named profile).
+- An AWS account with Amazon OpenSearch Service, Amazon OpenSearch Ingestion, Amazon Managed Service for Prometheus, Amazon ECS on AWS Fargate, AWS Lambda, Amazon SNS, and **AWS DevOps Agent** available in your Region (for example, `us-east-1`).
+- AWS DevOps Agent enabled, with a **generic webhook** integration created (gives you a webhook URL and an HMAC signing secret).
+- Node.js 18+ and AWS CDK v2 (`npm install -g aws-cdk`).
+- The AWS CLI configured for the target account.
 
-> All account-specific values (account id, ARNs, domain endpoints, the webhook URL and HMAC secret, EC2 instance ids) are supplied as **CDK context / environment parameters or AWS Secrets Manager entries** — none are hard-coded in this sample.
+All account-specific values (ARNs, endpoints, the webhook URL and HMAC secret, instance ids) are supplied as CDK context / environment parameters or AWS Secrets Manager entries — none are hard-coded.
 
 ## Deployment
 
-Follow the linear **[Quick Start Guide](docs/quick-start-guide.md)** for the full step-by-step, or [prerequisites-and-deployment.md](docs/prerequisites-and-deployment.md) for the complete input reference. In summary:
+See the **[Quick Start Guide](docs/quick-start-guide.md)** for the full walkthrough and [prerequisites-and-deployment.md](docs/prerequisites-and-deployment.md) for the complete input reference. In summary:
 
 ```bash
-# 1. Deploy the observability platform (Part 1) from the upstream OpenSearch project:
-#    https://observability.opensearch.org/docs/deploy/aws/  (deploy into a VPC)
+# 1. Deploy the observability platform (Part 1) from the upstream OpenSearch project
+#    into a VPC: https://observability.opensearch.org/docs/deploy/aws/
 #    See observability-stack/README.md for the coordinates Part 2 needs.
 
-# 2. Build the OpenSearch MCP image in-account (no local Docker) via CodeBuild
-cd ../devops-agent-integration && npm install
+# 2. Build the OpenSearch MCP image in-account with AWS CodeBuild (no local Docker)
+cd devops-agent-integration && npm install
 bash mcp-servers/tls/generate.sh          # internal TLS cert (git-ignored; read at synth)
 cdk deploy DevOpsAgent-Build --require-approval never
 aws codebuild start-build --project-name devops-agent-mcp-build   # wait for SUCCEEDED
 
-# 3. Store the DevOps Agent webhook secret (never commit this)
+# 3. Store the DevOps Agent webhook secret in AWS Secrets Manager
 aws secretsmanager create-secret \
   --name devops-agent/webhook-hmac \
   --secret-string "<YOUR_WEBHOOK_HMAC_SECRET>"
 
-# 4. Deploy detection + agent integration
-#    Supply ALL obs-stack coordinates (see the full guide) — the placeholder
-#    defaults let `cdk synth` pass but will mis-target on deploy.
+# 4. Deploy detection + agent integration (supply ALL obs-stack coordinates)
 cdk deploy --all \
   -c obsVpcId=... -c obsSubnetIds=... -c obsSecurityGroupId=... \
   -c opensearchEndpoint=... -c domainArn=... \
   -c ampWorkspaceId=... -c ampEndpoint=... -c ampWorkspaceArn=... \
   -c fgacMasterRoleArn=... \
   -c devopsAgentWebhookUrl="<YOUR_WEBHOOK_URL>" \
-  -c assignPublicIpForFargate=true \   # public-subnet quickstart; omit for private (secure-by-default, needs NAT/VPC endpoints)
+  -c assignPublicIpForFargate=true \   # public-subnet quickstart; omit for private (needs NAT/VPC endpoints)
   --require-approval never
 
-# 5. Register detection + notification role, then verify the loop (read-only)
-#    (register-from-host.sh installs the monitors/FGAC/AMP rules + the OpenSearch→SNS role)
+# 5. Install monitors/rules + the OpenSearch→SNS role, then verify the loop (read-only)
 bash ./scenarios/verify.sh
 ```
 
-> Before deploying, export `CDK_DEFAULT_ACCOUNT` and `CDK_DEFAULT_REGION` for your
-> target account/Region (no code edit needed). See [docs/prerequisites-and-deployment.md](docs/prerequisites-and-deployment.md)
-> for the full input table and discovery commands.
+Export `CDK_DEFAULT_ACCOUNT` and `CDK_DEFAULT_REGION` for your target account/Region before deploying. The CDK app splits into **Build** (Amazon ECR + AWS CodeBuild for the arm64 MCP image), **Shared** (networking/IAM), **FargateMcp** (the OpenSearch MCP server on Amazon ECS on AWS Fargate), **SignalBridge** (Amazon SNS + AWS Lambda), and **Integration** (AWS DevOps Agent Service / Association / PrivateConnection / Asset), so you can deploy incrementally.
 
-The CDK app is split into stacks so you can deploy incrementally: **Build** (ECR + CodeBuild for the arm64 MCP image), **Shared** (networking/IAM), **FargateMcp** (the OpenSearch MCP evidence server on ECS Fargate), **SignalBridge** (SNS + Lambda), and **Integration** (DevOps Agent AgentSpace / Service / Association / PrivateConnection / Asset).
+## Running the demo
 
-## Running the Demo
+Reproduce incidents deterministically; full catalog in [docs/demo-scenarios.md](docs/demo-scenarios.md).
 
-The bundled workloads let you reproduce incidents deterministically. See [docs/demo-scenarios.md](docs/demo-scenarios.md) for the full catalog.
-
-**OpenTelemetry Astronomy Shop (via `flagd`):**
 ```bash
-# Induce a payment failure — trips the log error-rate and AMP PromQL monitors
+# OpenTelemetry Astronomy Shop — induce a payment failure
+# (trips the log error-rate and Amazon Managed Service for Prometheus PromQL monitors)
 ./scenarios/induce-flag.sh          # FLAG=paymentFailure VARIANT=100%
-# Reset
 ./scenarios/reset-flag.sh
-```
 
-**GenAI travel-planner (via the fault-injection panel):**
-```bash
-# Drive weather-agent latency + errors — trips the two GenAI-agent monitors
+# GenAI travel-planner — drive weather-agent latency + errors (trips the two GenAI monitors)
 curl -s -X POST http://<fault-panel>:8085/config \
-  -H 'content-type: application/json' \
-  -d '{"preset":"chaos"}'
-# Return to healthy
+  -H 'content-type: application/json' -d '{"preset":"chaos"}'
 curl -s -X POST http://<fault-panel>:8085/config \
   -H 'content-type: application/json' -d '{"preset":"all_clean"}'
 ```
 
-Within ~1–5 minutes the relevant monitor breaches, the Signal Bridge delivers the incident to AWS DevOps Agent, and an investigation begins. Watch delivery in the Signal Bridge Lambda logs (`"event":"delivered","httpStatus":200`).
+Within ~1–5 minutes the monitor breaches, the signal bridge delivers the incident to AWS DevOps Agent, and an investigation begins. Watch delivery in the AWS Lambda logs (`"event":"delivered","httpStatus":200`).
 
-## Detection Monitors
+## Detection monitors
 
 | Monitor | Signal | Fires when |
 |---|---|---|
-| `M-logs-error-rate` | OpenSearch logs | payment/checkout WARN+ log error rate ≥ 5% |
-| `M-trace-latency-slo` | OpenSearch traces | purchase-path services p95 > 250 ms |
-| `M-servicemap-anomaly` | OpenSearch traces | per-service error rate derived from spans ≥ 5% |
-| `M-amp-promql` | AMP metrics | checkout 5xx ratio > 20% (PromQL rule) |
-| `M-travelagent-error-rate` | OpenSearch traces (GenAI) | travel-planner/weather/events agent error rate ≥ 10% |
-| `M-travelagent-latency-slo` | OpenSearch traces (GenAI) | weather-agent slow-call (>5 s) ratio ≥ 20% |
+| `M-logs-error-rate` | Amazon OpenSearch Service logs | payment/checkout WARN+ log error rate ≥ 5% |
+| `M-trace-latency-slo` | Amazon OpenSearch Service traces | purchase-path services p95 > 250 ms |
+| `M-servicemap-anomaly` | Amazon OpenSearch Service traces | per-service error rate from spans ≥ 5% |
+| `M-amp-promql` | Amazon Managed Service for Prometheus | checkout 5xx ratio > 20% (PromQL rule) |
+| `M-travelagent-error-rate` | Amazon OpenSearch Service traces (GenAI) | travel-planner/weather/events agent error rate ≥ 10% |
+| `M-travelagent-latency-slo` | Amazon OpenSearch Service traces (GenAI) | weather-agent slow-call (>5 s) ratio ≥ 20% |
 
-Each monitor publishes to the shared SNS notification channel and carries a `runbook://` reference the agent resolves during investigation. Thresholds are grounded in observed baseline telemetry (for example, GenAI services use a slow-call ratio rather than a raw p95, because their baseline latency is naturally high and spiky).
+Each monitor publishes to the shared Amazon SNS channel and carries a `runbook://` reference the agent resolves during investigation. Thresholds are grounded in observed baseline telemetry.
 
-## Cost Assessment
+## Cost
 
-Indicative only — actual cost depends on Region, retention, and traffic. Representative standing costs (Sydney, at time of writing):
+Indicative only; actual cost depends on Region, retention, and traffic.
 
-- **Amazon OpenSearch Service domain** — the dominant cost; sized by instance type/count and EBS.
-- **Amazon OpenSearch Ingestion (OSIS)** — billed per OCU-hour; floors at the configured minimum (e.g. 1 OCU).
+- **Amazon OpenSearch Service** domain — the dominant cost; sized by instance type/count and EBS.
+- **Amazon OpenSearch Ingestion** — per OCU-hour, floored at the configured minimum (e.g. 1 OCU).
 - **Amazon Managed Service for Prometheus** — per-sample ingestion + query.
-- **ECS Fargate (2 MCP tasks) + internal NLBs** — small standing cost for the always-on evidence servers.
-- **Lambda / SNS / Secrets Manager** — negligible at demo volumes.
-- **Optional S3 zero-ETL direct query** — pay-per-query managed Spark (`DirectQueryOCU`); **avoid `auto_refresh` acceleration indexes unless you need them**, as they run continuous refresh jobs that accrue cost 24/7.
+- **Amazon ECS on AWS Fargate** (2 MCP tasks) + internal Network Load Balancers — small always-on cost.
+- **AWS Lambda / Amazon SNS / AWS Secrets Manager** — negligible at demo volumes.
+- **Optional Amazon S3 zero-ETL direct query** — pay-per-query managed Spark; avoid `auto_refresh` acceleration indexes unless needed, as they refresh 24/7.
 
-Use AWS Cost Explorer / Cost Anomaly Detection and tear the stack down when not in use (see [Cleanup](#cleanup)).
+Use AWS Cost Explorer / AWS Cost Anomaly Detection and tear the stack down when idle.
 
 ## Cleanup
 
 ```bash
 cd devops-agent-integration && cdk destroy --all
 cd ../observability-stack && cdk destroy --all
-# Then remove any manually created items: the webhook secret, any S3 log-lake buckets,
-# and any OpenSearch direct-query acceleration indexes (DROP + VACUUM) if you created them.
+# Then remove the webhook secret, any Amazon S3 log-lake buckets, and any
+# Amazon OpenSearch Service direct-query acceleration indexes (DROP + VACUUM).
 ```
 
 ## Security
 
-- All transport is TLS 1.2+; the OpenSearch domain enforces HTTPS and uses fine-grained access control (FGAC) with IAM-based principals.
-- The webhook is authenticated with **HMAC-SHA256** and replay protection; the secret is stored in AWS Secrets Manager, never in code.
-- MCP servers run VPC-private behind internal TLS NLBs and are reached via `AWS::DevOpsAgent::PrivateConnection`; there is **no inbound path into the VPC**.
+- TLS 1.2+ everywhere; the Amazon OpenSearch Service domain enforces HTTPS with fine-grained access control (FGAC) and IAM principals.
+- The webhook uses **HMAC-SHA256** with replay protection; the secret lives in **AWS Secrets Manager**, never in code.
+- The MCP server runs VPC-private behind an internal TLS Network Load Balancer, reached via `AWS::DevOpsAgent::PrivateConnection` — no inbound path into the VPC.
 - IAM roles are least-privilege with explicit resource ARNs (no `Action: "*"` / `Resource: "*"` for data paths).
-- This is sample code — review and harden (retention, KMS, network, quotas) before any non-demo use.
+- Sample code — review and harden (retention, AWS KMS, network, quotas) before any non-demo use.
 
-See [SECURITY.md](SECURITY.md) and [docs/security-hardening.md](docs/security-hardening.md) for the secure-by-default posture, the cdk-nag findings and dispositions, and hardening steps; a lightweight threat model is in [threat-modeling/](threat-modeling/README.md). To report a vulnerability, use the [AWS vulnerability reporting page](https://aws.amazon.com/security/vulnerability-reporting/) — do not open a public issue.
+See [SECURITY.md](SECURITY.md), [docs/security-hardening.md](docs/security-hardening.md), and the [threat model](threat-modeling/README.md). Report vulnerabilities via the [AWS vulnerability reporting page](https://aws.amazon.com/security/vulnerability-reporting/) — do not open a public issue.
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-This sample code is made available under the **MIT-0** license. See the [LICENSE](LICENSE) file. Third-party components and their licenses are listed in [THIRD-PARTY-LICENSES.txt](THIRD-PARTY-LICENSES.txt); see also [NOTICE](NOTICE).
+MIT-0. See [LICENSE](LICENSE). Third-party components are listed in [THIRD-PARTY-LICENSES.txt](THIRD-PARTY-LICENSES.txt); see also [NOTICE](NOTICE).

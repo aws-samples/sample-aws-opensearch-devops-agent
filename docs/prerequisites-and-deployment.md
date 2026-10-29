@@ -76,6 +76,12 @@ domain, AMP workspace, OSIS pipeline, OpenSearch UI, and the OTel demo host), in
 - CLI installer: https://github.com/opensearch-project/observability-stack/blob/main/aws/cli-installer/README.md
 - CDK: https://github.com/opensearch-project/observability-stack/blob/main/aws/cdk/README.md
 
+> **Pick "Standard create" (advanced), not "Easy create", for the OpenSearch domain.** Easy
+> create makes a public-access domain with no VPC option; Part 2 requires a **VPC-private**
+> domain (FGAC/TLS/KMS over private networking). Standard create is the path that lets you
+> enable **VPC access** and choose the subnets + security group. You cannot migrate an
+> Easy-create (public) domain into a VPC afterward — recreate it with Standard create.
+
 Then capture the coordinates from the [configuration table](#configuration-inputs) above.
 See [`../observability-stack/README.md`](../observability-stack/README.md) for the contract
 Part 2 depends on.

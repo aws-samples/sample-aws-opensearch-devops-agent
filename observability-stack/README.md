@@ -28,6 +28,11 @@ directly from there, then capture its coordinates for Part 2
 > For the VPC-private posture this sample assumes, deploy the platform into a VPC
 > (the upstream installer/CDK takes `--vpc-id` / `--subnet-ids` / `--security-group-ids`),
 > then pass those same coordinates to Part 2.
+>
+> **When the domain-creation step offers "Easy create" vs "Standard create", pick Standard
+> create (advanced).** Easy create builds a public domain with no VPC option; only Standard
+> create lets you enable VPC access and select subnets + security group. An Easy-create domain
+> can't be moved into a VPC later — it would have to be deleted and recreated.
 
 See [`../docs/architecture.md`](../docs/architecture.md) for how this platform fits the
 overall design.
