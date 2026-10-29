@@ -10,7 +10,7 @@ Turn an Amazon OpenSearch Service observability stack into a self-driving incide
 
 ![Amazon OpenSearch Service observability, checkout service view](docs/images/opensearch-screenshot.jpg)
 
-*Amazon OpenSearch Service observability: the `checkout` service view (fault rate, availability, P99 latency, and the per-dependency breakdown) that the detection monitors watch. Here the 5xx fault rate has climbed to 15.77% and availability has dropped, tripping a monitor.*
+*Amazon OpenSearch Service observability: the `checkout` service view (fault rate, availability, latency, and the per-dependency breakdown) that the detection monitors watch for anomalies.*
 
 ![AWS DevOps Agent investigating the incident](docs/images/devops-screenshot.jpg)
 
