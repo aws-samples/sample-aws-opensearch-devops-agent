@@ -6,6 +6,16 @@ Turn an Amazon OpenSearch Service observability stack into a self-driving incide
 
 > Sample code for demonstration and learning. Review the [Security](#security) and [Cost](#cost) sections before deploying into any account.
 
+## What it looks like
+
+![Amazon OpenSearch Service observability, checkout service view](docs/images/opensearch-screenshot.jpg)
+
+*Amazon OpenSearch Service observability: the `checkout` service view (fault rate, availability, P99 latency, and the per-dependency breakdown) that the detection monitors watch. Here the 5xx fault rate has climbed to 15.77% and availability has dropped, tripping a monitor.*
+
+![AWS DevOps Agent investigating the incident](docs/images/devops-screenshot.jpg)
+
+*AWS DevOps Agent autonomously investigating the resulting incident: it identifies the root cause (a `paymentFailure` fault flag enabled on the demo host), the contributing causes, and the supporting evidence pulled from the telemetry, with no human opening a dashboard.*
+
 ## Start here
 
 Follow the **[Quick Start Guide](docs/quick-start-guide.md)**, a copy-paste checklist from clone to a working autonomous investigation (~60-90 min).
