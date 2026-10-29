@@ -1,8 +1,8 @@
 # Threat Model (lightweight)
 
-This is a starter threat model for the autonomous-monitoring sample, intended to
-seed a formal review (for example a Talos / PCSR open-source security review). It
-is not exhaustive.
+This is a lightweight, non-exhaustive threat model for the sample. Use it as a
+starting point for your own security review before adapting the sample for any
+non-demo use.
 
 ## Assets
 - Telemetry (logs, traces, metrics) in Amazon OpenSearch Service and AMP.

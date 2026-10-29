@@ -1,8 +1,8 @@
 # Security Hardening & Static Analysis
 
 This document records the secure-by-default posture, the static-analysis process,
-and the known findings with their justifications — the material an open-source
-security review (Talos / PCSR) will expect.
+and the known findings with their justifications, the material a security review
+of the sample would typically examine.
 
 ## Static analysis (cdk-nag)
 
