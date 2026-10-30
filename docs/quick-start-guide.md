@@ -5,6 +5,8 @@ Full details/troubleshooting: [prerequisites-and-deployment.md](prerequisites-an
 
 > **Run everything from your local machine; commands act on AWS via API/CDK/SSM. The only non-terminal step is creating the webhook in the DevOps Agent console (Step 7).**
 
+> **AWS DevOps Agent cost.** Once the webhook is connected (Step 7), every monitor breach starts a billed autonomous investigation. By default the GenAI weather-agent monitors ship disabled and only the ecommerce monitors are enabled (they fire only on an injected fault, throttled to once per hour). If investigations ever run away, stop them by disabling the monitors (see [Step 10](#10-trigger-an-incident)), and tear everything down with [Step 11](#11-clean-up) when done.
+
 > **Fill in every `<...>` placeholder with your own value before running — don't paste the angle brackets.** In zsh/bash `<` and `>` are redirection operators, so a literal `<account-id>` throws a parse error instead of an obvious message.
 
 > **Each command is kept on a single line on purpose.** Copy one fenced block at a time. If your
@@ -204,14 +206,27 @@ Within ~1–5 min an investigation appears in the DevOps Agent console (Agent Sp
 ```bash
 FLAG=paymentFailure INSTANCE_ID=$DEMO_INSTANCE_ID bash ./scenarios/reset-flag.sh
 ```
-> **Cost control.** Each fired alert starts a DevOps Agent investigation, which incurs
-> agent/model cost. Every monitor's notify action is **throttled to once per 60 min**, so a
-> sustained fault triggers at most ~1 investigation per monitor per hour — not one per
-> evaluation. Still: **reset the fault** (above) once you've seen the investigation so it doesn't
-> keep re-firing each hour, and note the **standing infrastructure** (OpenSearch domain, the
-> Fargate MCP tasks + NLB, the demo EC2 host, AMP/OSIS) bills continuously until you run the
-> Step 11 cleanup. Also keep the fault-panel's real-LLM mode **off** unless you intend to incur
-> Amazon Bedrock model-invocation cost (see [demo-scenarios.md](demo-scenarios.md)).
+> **Cost control (AWS DevOps Agent).** Each fired alert that reaches the webhook starts an
+> AWS DevOps Agent investigation, which is billed and is the main runaway-cost risk. Guardrails
+> in this sample:
+> - The GenAI weather-agent monitors (`M-travelagent-*`) ship **disabled** (`"enabled": false`),
+>   because their baseline can breach and start an investigation with no fault injected. Only the
+>   ecommerce monitors are enabled, and they fire **only on an injected fault**.
+> - Every enabled monitor's notify action is **throttled to once per 60 min**, so a sustained
+>   fault triggers at most ~1 investigation per monitor per hour, not one per evaluation.
+> - See delivered investigations with a Logs Insights query over
+>   `/aws/lambda/devops-agent-signal-bridge`: `filter event="delivered" | stats count() by monitorId`.
+>
+> **To stop investigations:** disable the monitor(s) — set `"enabled": false` in
+> `monitors/*.json` and re-run Step 8, or toggle them off in OpenSearch Dashboards under
+> **Alerting → Monitors** — or remove the signal-bridge Lambda's subscription to the
+> `devops-agent-alerts` SNS topic / revoke the webhook in the DevOps Agent console.
+>
+> Always **reset the fault** (above) once you've seen the investigation so it doesn't keep
+> re-firing each hour, and note the **standing infrastructure** (OpenSearch domain, the Fargate
+> MCP tasks + NLB, the demo EC2 host, AMP/OSIS) bills continuously until you run the Step 11
+> cleanup. Also keep the fault-panel's real-LLM mode **off** unless you intend to incur Amazon
+> Bedrock model-invocation cost (see [demo-scenarios.md](demo-scenarios.md)).
 
 ### 11. Clean up
 **This repo's stacks (Steps 4–6) are CloudFormation**, so `cdk destroy` removes them cleanly — including the

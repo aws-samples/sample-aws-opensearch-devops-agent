@@ -2,7 +2,7 @@
   "type": "monitor",
   "name": "M-travelagent-latency-slo",
   "monitor_type": "query_level_monitor",
-  "enabled": true,
+  "enabled": false,
   "schedule": { "period": { "interval": 1, "unit": "MINUTES" } },
   "inputs": [
     {
