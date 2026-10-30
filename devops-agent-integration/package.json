@@ -19,7 +19,7 @@
     "@types/node": "20.19.43",
     "aws-cdk": "2.1141.0",
     "aws-sdk-client-mock": "4.1.0",
-    "esbuild": "0.23.1",
+    "esbuild": "0.28.1",
     "fast-check": "3.23.2",
     "jest": "^30.5.2",
     "ts-jest": "^29.4.15",
