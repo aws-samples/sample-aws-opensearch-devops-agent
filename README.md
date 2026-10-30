@@ -35,12 +35,12 @@ Source for the diagram: [`docs/images/architecture.svg`](docs/images/architectur
 
 ## Key features
 
-- **Closed detection to investigation loop.** Amazon OpenSearch Service alerting and Amazon Managed Service for Prometheus rules trigger AWS DevOps Agent with no human in the path.
-- **Secure signal bridge.** Alerts converge on Amazon SNS; an AWS Lambda HMAC-SHA256-signs each payload (replay-protected) before POSTing to the DevOps Agent webhook, with no inbound path into the VPC.
-- **On-demand evidence via MCP.** The OpenSearch MCP server (`opensearch-mcp-server-py`) lets the agent pull correlated logs, traces, service map, and PPL during an investigation.
-- **VPC-private by design.** The MCP server runs on Amazon ECS on AWS Fargate behind an internal TLS Network Load Balancer, reached via `AWS::DevOpsAgent::PrivateConnection`. The Amazon OpenSearch Service domain and Amazon Managed Service for Prometheus workspace are never exposed publicly.
-- **Fault-injectable workloads.** Toggle faults in the [OpenTelemetry Astronomy Shop](https://github.com/open-telemetry/opentelemetry-demo) (via `flagd`) and a GenAI travel-planner (via a fault panel) to reproduce incidents deterministically.
-- **Infrastructure as code.** AWS CDK (TypeScript), composable stacks, property-based tests (`fast-check`).
+- **No human in the loop.** OpenSearch and Prometheus alerts trigger the AWS DevOps Agent automatically.
+- **Secure by design.** Alerts are signed (HMAC-SHA256) before reaching the agent, and nothing is exposed to inbound traffic.
+- **Evidence on demand.** The agent queries logs, traces, and the service map through an OpenSearch MCP server while it investigates.
+- **VPC-private.** The OpenSearch domain, Prometheus workspace, and MCP server stay inside your VPC.
+- **Reproducible incidents.** Inject faults into the demo apps to trigger investigations on demand.
+- **Infrastructure as code.** AWS CDK (TypeScript), with tests.
 
 ## Prerequisites
 
