@@ -1,4 +1,4 @@
-# Autonomous Monitoring using Amazon OpenSearch Service and AWS DevOps Agent
+# Autonomous Incident Response with Amazon OpenSearch Service and AWS DevOps Agent
 
 [![CI](https://github.com/aws-samples/sample-aws-opensearch-devops-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/aws-samples/sample-aws-opensearch-devops-agent/actions/workflows/ci.yml)
 
