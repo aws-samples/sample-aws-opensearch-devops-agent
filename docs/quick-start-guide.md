@@ -240,23 +240,26 @@ aws secretsmanager delete-secret --secret-id devops-agent/webhook-hmac --force-d
 > delete command — but `cdk destroy --all` deletes the Agent Space that owns the webhook. If the
 > DevOps Agent console still shows a leftover Agent Space or webhook afterward, remove it there.
 
-**The observability-stack (Step 3) is NOT CloudFormation** — the upstream installer created it, so
-`cdk destroy` does not touch it and there is no teardown command here. **Delete its resources
-manually** (preferably via the installer's own teardown — see
-https://observability.opensearch.org/docs/deploy/aws/). The deployment is named `obs-stack-<id>`
-and spans these services — delete the domain/pipeline/host first, then the IAM roles and security
-group last, to avoid dependency errors:
-> - **Amazon OpenSearch Service** — the domain `obs-stack-<id>`, and its **OpenSearch UI application** (same name)
-> - **Amazon OpenSearch Ingestion (OSIS)** — the pipeline `obs-stack-<id>`
-> - **Amazon Managed Service for Prometheus (AMP)** — the workspace
-> - **Amazon EC2** — the OTel demo host instance `obs-stack-<id>-demo` (and its EBS volume)
-> - **Amazon EC2 (networking)** — the demo security group `obs-stack-<id>-demo-sg`
-> - **AWS IAM** — the roles `obs-stack-<id>-ec2-demo-role`, `obs-stack-<id>-osi-role`, `obs-stack-<id>-connected-data-source-prometheus-role` (and `obs-stack-directquery-role` if present)
-> - **AWS KMS** — the domain's encryption key, if a customer-managed key was created
+**The observability-stack (Step 3) is not part of this repo's CDK app.** The upstream CLI
+installer created it directly via the AWS SDK (not CloudFormation, and not CDK in this path), so
+`cdk destroy` here does not touch it. Tear it down with the installer's own `destroy` command
+(see the [CLI installer README](https://github.com/opensearch-project/observability-stack/blob/main/aws/cli-installer/README.md)):
+```bash
+npx @opensearch-project/observability-stack destroy --pipeline-name obs-stack-<id> --region "$AWS_REGION"
+```
+> `destroy` removes the EC2 demo host, the OpenSearch UI application, the Connected Data Source,
+> the OSIS pipeline, and the installer's IAM roles — but it **preserves the OpenSearch domain and
+> the AMP workspace** (it treats them as shared). Those two are the dominant standing cost, so you
+> **must delete them manually** afterward:
+> - **Amazon OpenSearch Service** — delete the domain `obs-stack-<id>` (`aws opensearch delete-domain --domain-name obs-stack-<id>`)
+> - **Amazon Managed Service for Prometheus (AMP)** — delete the workspace (`aws amp delete-workspace --workspace-id <ws-id>`)
+> - **AWS KMS** — schedule deletion of the domain's encryption key, if a customer-managed key was created
 > - **Amazon CloudWatch** — any `obs-stack-<id>` log groups
 >
-> Deploy the observability-stack only **once per VPC** — repeated deployments pile up these
-> resources and share/strip security groups, which breaks ingestion and the MCP connectivity.
+> If you deployed Part 1 via the upstream **CDK** variant instead of the CLI installer, tear it
+> down with `cdk destroy` in that upstream CDK project (it is a separate CloudFormation app from
+> this repo's). Deploy the observability-stack only **once per VPC** — repeated deployments pile up
+> these resources and share/strip security groups, which breaks ingestion and MCP connectivity.
 
 ---
 

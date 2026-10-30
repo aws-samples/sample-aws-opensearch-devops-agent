@@ -6,8 +6,6 @@ Turn an Amazon OpenSearch Service observability stack into a self-driving incide
 
 > Sample code for demonstration and learning. Review the [Security](#security) and [Cost](#cost) sections before deploying into any account.
 
-> **AWS DevOps Agent cost.** Every monitor breach that reaches the webhook starts an autonomous AWS DevOps Agent investigation, which is billed and can get expensive if a monitor fires often. To stay safe by default, the GenAI weather-agent monitors (which can breach on their own baseline) ship **disabled**, and the ecommerce monitors only fire on an injected fault and are throttled to one notification per hour. Read [Cost guardrails and stopping investigations](#cost-guardrails-and-stopping-investigations) before you connect the webhook.
-
 ## What it looks like
 
 ![Amazon OpenSearch Service observability, checkout service view](docs/images/opensearch-screenshot.jpg)
@@ -119,46 +117,43 @@ Within ~1-5 minutes the monitor breaches, the signal bridge delivers the inciden
 | `M-travelagent-error-rate` | Amazon OpenSearch Service traces (GenAI) | travel-planner/weather/events agent error rate ≥ 10% | **no** |
 | `M-travelagent-latency-slo` | Amazon OpenSearch Service traces (GenAI) | weather-agent slow-call (>5 s) ratio ≥ 20% | **no** |
 
-The four ecommerce (OpenTelemetry Astronomy Shop) monitors only fire when you inject a fault and are throttled to one notification per hour. The two GenAI travel-planner (weather-agent) monitors ship **disabled** (`"enabled": false`) because their baseline is naturally spiky and can breach, and so trigger a costly investigation, with no fault injected; enable them only if you specifically want the GenAI scenario. Each monitor publishes to the shared Amazon SNS channel and carries a `runbook://` reference the agent resolves during investigation.
+The four ecommerce (OpenTelemetry Astronomy Shop) monitors fire only on an injected fault. The two GenAI travel-planner monitors ship **disabled** because their baseline can breach on its own; enable them only if you want the GenAI scenario. Each monitor publishes to the shared Amazon SNS channel and carries a `runbook://` reference the agent resolves during investigation. See [Cost](#cost) for throttling and how investigations are billed.
 
 ## Cost
 
-Indicative only; actual cost depends on Region, retention, and traffic.
+Indicative only; actual cost depends on Region, retention, and traffic. Standing resources:
 
 - **Amazon OpenSearch Service** domain, the dominant cost; sized by instance type/count and EBS.
 - **Amazon OpenSearch Ingestion**: per OCU-hour, floored at the configured minimum (e.g. 1 OCU).
 - **Amazon Managed Service for Prometheus**: per-sample ingestion + query.
 - **Amazon ECS on AWS Fargate** (2 MCP tasks) + internal Network Load Balancers: small always-on cost.
 - **AWS Lambda / Amazon SNS / AWS Secrets Manager**: negligible at demo volumes.
-- **AWS DevOps Agent**: billed per investigation and potentially the largest variable cost. Each monitor breach delivered to the webhook starts one investigation, so a flapping or misconfigured monitor can drive cost up fast. See the guardrails below.
+
+**AWS DevOps Agent is the main variable cost:** each monitor breach delivered to the webhook starts a billed investigation. The defaults keep this in check: the GenAI weather-agent monitors ship disabled (they can breach on their own baseline), the ecommerce monitors fire only on an injected fault, and every enabled monitor is throttled to one notification per hour.
+
+**When you finish, stop the investigations or they keep costing you.** While a fault is active and its monitor is enabled, a new billed investigation starts every 60 minutes, indefinitely. Either run [Cleanup](#cleanup) (best, also stops the standing hourly costs), or turn the fault off (`./scenarios/reset-flag.sh`) **and** disable the monitor that fired (set `"enabled": false` and re-register, or toggle it off in OpenSearch Dashboards under **Alerting → Monitors**). To stop delivery for every monitor at once, remove the signal-bridge Lambda's `devops-agent-alerts` SNS subscription or revoke the webhook. Count delivered investigations with `filter event="delivered" | stats count() by monitorId` over `/aws/lambda/devops-agent-signal-bridge`.
 
 Use AWS Cost Explorer / AWS Cost Anomaly Detection and tear the stack down when idle.
 
-### Cost guardrails and stopping investigations
-
-Autonomous investigations are the main runaway-cost risk, so the default configuration keeps them to a minimum:
-
-- **Safe-by-default monitors.** The GenAI travel-planner (weather-agent) monitors ship **disabled**, because their baseline is spiky enough to breach and start an investigation even with no fault injected. The remaining ecommerce monitors only fire on an injected fault.
-- **Per-monitor throttle.** Every enabled monitor re-notifies at most once per 60 minutes while a fault persists (`throttle` in `devops-agent-integration/monitors/*.json`; the Amazon Managed Service for Prometheus path mirrors this with `repeat_interval: 60m`), so a sustained fault triggers about one investigation per monitor per hour, not one per evaluation.
-- **Visibility.** Each delivered investigation is logged as `{"event":"delivered","monitorId":...}` in `/aws/lambda/devops-agent-signal-bridge`. Count them per monitor with a CloudWatch Logs Insights query: `filter event="delivered" | stats count() by monitorId`.
-
-> **Turn investigations off before you walk away, or AWS DevOps Agent cost keeps adding up.** As long as a fault is active and its monitor is enabled, a **new billed investigation starts every 60 minutes, indefinitely**, whether or not anyone is watching. Do one of the following:
->
-> - **Best: tear the stack down.** Run [Cleanup](#cleanup). This also stops the standing hourly costs (Amazon OpenSearch Service, the Fargate MCP tasks, Amazon OpenSearch Ingestion, Amazon Managed Service for Prometheus).
-> - **If you are leaving the stack up:** turn the fault off (`./scenarios/reset-flag.sh`, or set the GenAI fault panel back to `all_clean`) **and** disable the monitor that was firing (set `"enabled": false` in `devops-agent-integration/monitors/*.json` then re-register, or toggle it off in OpenSearch Dashboards under **Alerting → Monitors**).
-
-To cut delivery for every monitor at once, remove the signal-bridge Lambda's subscription to the `devops-agent-alerts` SNS topic, or revoke the webhook in the AWS DevOps Agent console.
-
 ## Cleanup
 
-Tear the stack down when you are done. This is the surest way to stop both the hourly standing costs and any further AWS DevOps Agent investigations.
+Tear everything down when you are done. This is the surest way to stop both the hourly standing costs and any further AWS DevOps Agent investigations.
+
+**Part 2 (this repo)** is a CDK/CloudFormation app, so it destroys cleanly:
 
 ```bash
 cd devops-agent-integration && cdk destroy --all
-cd ../observability-stack && cdk destroy --all
+aws secretsmanager delete-secret --secret-id devops-agent/webhook-hmac --force-delete-without-recovery --region <region>
 ```
 
-> If you keep the stack running, make sure no fault is left injected **and** the firing monitor is disabled (see [Cost guardrails and stopping investigations](#cost-guardrails-and-stopping-investigations)); otherwise a monitor will keep starting a new billed investigation every 60 minutes.
+**Part 1 (the observability-stack)** was created by the upstream CLI installer, not by this repo, so `cdk destroy` here does not touch it. Tear it down with the installer's own `destroy`, then delete the domain and AMP workspace it leaves behind (they are preserved as "shared" and are the dominant cost):
+
+```bash
+npx @opensearch-project/observability-stack destroy --pipeline-name obs-stack-<id> --region <region>
+# then manually: delete the OpenSearch Service domain and the Amazon Managed Service for Prometheus workspace
+```
+
+See the [Quick Start cleanup step](docs/quick-start-guide.md#11-clean-up) for the full resource list. If you leave the stack running instead, follow the "stop the investigations" note under [Cost](#cost) so a monitor does not keep firing hourly.
 
 ## Security
 
